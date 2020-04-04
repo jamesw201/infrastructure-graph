@@ -6,14 +6,14 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait HttpMethods {
-    async fn get(url: String) -> Result<reqwest::Response, reqwest::Error>;
+    async fn get(&self, url: String) -> Result<reqwest::Response, reqwest::Error>;
 }
 
 pub struct HttpClient;
 
 #[async_trait]
 impl HttpMethods for HttpClient {
-    async fn get(url: String) -> Result<reqwest::Response, reqwest::Error> {
+    async fn get(&self, url: String) -> Result<reqwest::Response, reqwest::Error> {
         reqwest::get(&url).await
     }
 }
