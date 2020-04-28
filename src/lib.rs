@@ -3,3 +3,6 @@
 pub mod ip_service;
 pub mod foo;
 pub mod http_client;
+pub mod cloud_template_parser;
+pub mod nom_parsers;
+pub mod terraform;
