@@ -30,4 +30,28 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [√] build basic tests for the CloudTemplateParser construct
 [√] build skeleton entities for the CloudTemplateParser construct
 [√] read in files
-[ ] translate our first template resource into a struct
+[√] translate our first template resource into a struct
+
+[√] parse multiple resources separated by blank lines
+[ ] parse multiple resources separated by blank lines and comment lines
+[ ] parse nested blocks
+[ ] parse nested json blocks
+[ ] build relationships from templated attribute values
+[ ] build relationships from json values
+
+[ ] parse whole files from cli
+
+[ ] create json transform from AST
+[ ] create rdf transform from AST
+
+[ ] create security policies which run against the AST
+[ ] create react diagrams from the output of the AST
+
+[ ] deploy to lambda function
+[ ] query the AST
+[ ] create SRE pipeline including notebooks and Slack alarm posts
+[ ] use machine learning to build intuitions based on the AST and supporting data
+[ ] show graph changes over time in React app
+[ ] create VR representaion of graph
+
+[ ] take over the world

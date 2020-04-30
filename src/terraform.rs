@@ -33,11 +33,30 @@ pub struct Attribute {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct TerraformBlock {
-  block_type: String,
-  first_identifier: String,
-  second_identifier: String,
-  attributes: Vec<Attribute>
+pub enum TerraformBlock {
+    NoIdentifiers(TerraformBlockWithNoIdentifiers),
+    WithOneIdentifier(TerraformBlockWithOneIdentifier),
+    WithTwoIdentifiers(TerraformBlockWithTwoIdentifiers)
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct TerraformBlockWithNoIdentifiers {
+    block_type: String,
+    attributes: Vec<Attribute>
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct TerraformBlockWithOneIdentifier {
+    block_type: String,
+    first_identifier: String,
+    attributes: Vec<Attribute>
+}
+#[derive(PartialEq, Debug, Clone)]
+pub struct TerraformBlockWithTwoIdentifiers {
+    block_type: String,
+    first_identifier: String,
+    second_identifier: String,
+    attributes: Vec<Attribute>
 }
 
 
@@ -104,6 +123,39 @@ fn separated_attributes(i: &str) -> IResult<&str, Vec<(&str, AttributeType)>> {
     separated_list0(preceded(space0, newline), key_value)(i)
 }
 
+fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType)>) -> TerraformBlock {
+    match identifiers.len() {
+        1 => {
+            TerraformBlock::NoIdentifiers(
+                TerraformBlockWithNoIdentifiers {
+                    block_type: identifiers[0].to_string(),
+                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                }
+            )
+        },
+        2 => {
+            TerraformBlock::WithOneIdentifier(
+                TerraformBlockWithOneIdentifier {
+                    block_type: identifiers[0].to_string(),
+                    first_identifier: identifiers[1].to_string(),
+                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                }
+            )
+        },
+        3 => {
+            TerraformBlock::WithTwoIdentifiers(
+                TerraformBlockWithTwoIdentifiers {
+                    block_type: identifiers[0].to_string(),
+                    first_identifier: identifiers[1].to_string(),
+                    second_identifier: identifiers[2].to_string(),
+                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                }
+            )
+        },
+        _ => panic!("encountered terraform block with too many identifiers")
+    }
+}
+
 fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
     let (rest, identifiers) = 
         delimited(
@@ -115,7 +167,7 @@ fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
         )(i)?;
     println!("identifiers: {:?}", identifiers);
 
-    let (rest, block): (&str, Vec<(String, AttributeType)>) = 
+    let (rest, attributes): (&str, Vec<(String, AttributeType)>) = 
         preceded(
             char('{'),
             preceded(multispace0,
@@ -131,42 +183,27 @@ fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
             ),
         )(rest)?;
 
-    println!("block: {:?}", block);
+    println!("attributes: {:?}", attributes);
 
-    // TODO: create a custom functtion to map over the parser, returning the block_type based on the number of identifiers
-    let attribute1 = Attribute {
-        key: String::from("description"),
-        value: AttributeType::Str(String::from("Master key used for creating/decrypting cache token data keys"))
-    };
-
-    let tf_block = TerraformBlock {
-        block_type: String::from("block_type"),
-        first_identifier: String::from("identifiers.get(0)"),
-        second_identifier: String::from("identifiers.get(1)"),
-        attributes: vec![attribute1]
-    };
-    // TODO: use 'terminated' to recognise the end of the block
-    Ok(("", tf_block))
+    let block = build_tf_block(identifiers, attributes);
+    Ok((rest, block))
 }
 
-/// the root element of a JSON parser is either an object or an array
+/// the root element
 #[allow(dead_code)]
-fn root(i: &str) -> IResult<&str, TerraformBlock> {
-    // many0(
-    //     preceded(
-    //         space0,
-    //         alt((
-    //             comment_one_line,
-    //             block
-    //         ))
-    //     )
-    // )(i)
-    preceded(
-        space0,
-        tf_block
+fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
+    many0(
+        preceded(multispace0, tf_block)
     )(i)
 }
 
+// TODO: 
+// [√] parse multiple resources separated by blank lines
+// [ ] parse multiple resources separated by blank lines and comment lines
+// [ ] parse nested blocks
+// [ ] parse nested json blocks
+// [ ] build relationships from templated attribute values
+// [ ] build relationships json values
 
 #[cfg(test)]
 mod tests {
@@ -205,17 +242,68 @@ resource "aws_kms_key" "discovery_cache-master-key" {
 }
 "#;
         let result = root(data);
-        let expected_attr = Attribute {
+        let first_attr = Attribute {
             key: String::from("description"),
             value: AttributeType::Str(String::from("Master key used for creating/decrypting cache token data keys"))
         };
-        let expected = TerraformBlock {
+        let second_attr = Attribute {
+            key: String::from("enable_key_rotation"),
+            value: AttributeType::Boolean(true)
+        };
+        let block = TerraformBlockWithTwoIdentifiers {
             block_type: String::from("resource"),
             first_identifier: String::from("aws_kms_key"),
             second_identifier: String::from("discovery_cache-master-key"),
-            attributes: vec![expected_attr]
+            attributes: vec![first_attr, second_attr]
         };
-        assert_eq!(result, Ok(("", expected)))
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block)];
+        assert_eq!(result, Ok(("\n", expected)))
+    }
+
+    #[test]
+    fn terraform_multiple_blocks() {
+        let data = r#"
+resource "aws_kms_key" "discovery_cache-master-key" {
+    description = "Master key used for creating/decrypting cache token data keys"
+    enable_key_rotation = true
+}
+
+resource "aws_lambda_event_source_mapping" "discovery_publisher-lambda-sqs-mapping" {
+  batch_size        = "1"
+  enabled           = true
+}
+"#;
+        let result = root(data);
+        let first_attr = Attribute {
+            key: String::from("description"),
+            value: AttributeType::Str(String::from("Master key used for creating/decrypting cache token data keys"))
+        };
+        let second_attr = Attribute {
+            key: String::from("enable_key_rotation"),
+            value: AttributeType::Boolean(true)
+        };
+        let first_attr1 = Attribute {
+            key: String::from("batch_size"),
+            value: AttributeType::Str(String::from("1"))
+        };
+        let second_attr2 = Attribute {
+            key: String::from("enabled"),
+            value: AttributeType::Boolean(true)
+        };
+        let block = TerraformBlockWithTwoIdentifiers {
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_kms_key"),
+            second_identifier: String::from("discovery_cache-master-key"),
+            attributes: vec![first_attr, second_attr]
+        };
+        let block2 = TerraformBlockWithTwoIdentifiers {
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_lambda_event_source_mapping"),
+            second_identifier: String::from("discovery_publisher-lambda-sqs-mapping"),
+            attributes: vec![first_attr1, second_attr2]
+        };
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block), TerraformBlock::WithTwoIdentifiers(block2)];
+        assert_eq!(result, Ok(("\n", expected)))
     }
 
     #[test]
