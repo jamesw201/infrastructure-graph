@@ -33,16 +33,17 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [√] translate our first template resource into a struct
 
 [√] parse multiple resources separated by blank lines
-[ ] parse multiple resources separated by blank lines and comment lines
-[ ] parse nested blocks
-[ ] parse nested json blocks
-[ ] build relationships from templated attribute values
-[ ] build relationships from json values
-
+[√] parse multiple resources separated by blank lines and comment lines
+[√] parse nested blocks
+[√] parse arrays
+[√] parse nested json blocks
 [ ] parse whole files from cli
 
 [ ] create json transform from AST
 [ ] create rdf transform from AST
+
+[ ] build relationships from templated attribute values
+[ ] build relationships from json values
 
 [ ] create security policies which run against the AST
 [ ] create react diagrams from the output of the AST
@@ -50,6 +51,7 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [ ] deploy to lambda function
 [ ] query the AST
 [ ] create SRE pipeline including notebooks and Slack alarm posts
+
 [ ] use machine learning to build intuitions based on the AST and supporting data
 [ ] show graph changes over time in React app
 [ ] create VR representaion of graph

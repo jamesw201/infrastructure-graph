@@ -12,7 +12,8 @@ use nom::{
   IResult
 };
 
-use std::collections::HashMap;
+use crate::json::{JsonValue, parse_json};
+
 use std::str;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -22,8 +23,8 @@ pub enum AttributeType {
     Boolean(bool),
     Num(f64),
     Array(Vec<AttributeType>),
-    Block(HashMap<String, AttributeType>),
-    Json()
+    Block(Vec<(String, AttributeType)>),
+    Json(JsonValue)
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -51,6 +52,7 @@ pub struct TerraformBlockWithOneIdentifier {
     first_identifier: String,
     attributes: Vec<Attribute>
 }
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct TerraformBlockWithTwoIdentifiers {
     block_type: String,
@@ -91,6 +93,16 @@ fn comment_one_line(i: &str) -> IResult<&str, ()> {
     Ok((rest, ()))
 }
 
+fn parse_array(i: &str) -> IResult<&str, Vec<AttributeType>> {
+    preceded(
+        char('['), 
+        terminated(
+            separated_list0(preceded(space0, char(',')), block_value),
+            preceded(space0, char(']'))
+        )
+    )(i)
+}
+
 fn valid_identifier_char(c: char) -> bool {
   c.is_alphanumeric() || c == '_'
 }
@@ -101,7 +113,36 @@ fn valid_identifier(i: &str) -> IResult<&str, &str> {
 
 #[allow(dead_code)]
 fn key_value(i: &str) -> IResult<&str, (&str, AttributeType)> {
-    separated_pair(preceded(space0, valid_identifier), preceded(space0, char('=')), block_value)(i)
+    println!("key_value: {}", i);
+    preceded(
+        multispace0,
+        alt((
+            separated_pair(preceded(space0, valid_identifier), space0, block_value),
+            separated_pair(preceded(space0, valid_identifier), preceded(space0, char('=')), block_value)
+        ))
+    )(i)
+}
+
+fn json_value(i: &str) -> IResult<&str, JsonValue> {
+    preceded(
+        multispace0, 
+        preceded(
+            alt((
+                tag("<<EOF"),
+                tag("<<CONTAINER_DEFINITIONS")
+            )), 
+            terminated(
+                parse_json, 
+                preceded(
+                    multispace0, 
+                    alt((
+                        tag("EOF"),
+                        tag("CONTAINER_DEFINITIONS")
+                    ))
+                )
+            )
+        )
+    )(i)
 }
 
 fn block_value(i: &str) -> IResult<&str, AttributeType> {
@@ -111,6 +152,9 @@ fn block_value(i: &str) -> IResult<&str, AttributeType> {
       map(boolean, AttributeType::Boolean),
       map(double, AttributeType::Num),
       map(escaped_string, |s| AttributeType::Str(String::from(s))),
+      map(basic_block, AttributeType::Block),
+      map(parse_array, AttributeType::Array),
+      map(json_value, AttributeType::Json),
     )),
   )(i)
 }
@@ -152,36 +196,45 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                 }
             )
         },
-        _ => panic!("encountered terraform block with too many identifiers")
+        _ => panic!("encountered terraform block with too many identifiers: {:?}", identifiers)
     }
 }
 
-fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
-    let (rest, identifiers) = 
-        delimited(
+fn basic_block(i: &str) -> IResult<&str, Vec<(String, AttributeType)>> {
+    preceded(
+        char('{'),
+        preceded(
             multispace0,
-            many0(
-                preceded(space0, alt((alphanumeric1, escaped_string)))
-            ),
-            opt(space0)
-        )(i)?;
+            terminated(
+                map(
+                    separated_attributes, 
+                        |tuple_vec| { // tempted to see if we can do without this mapping
+                            tuple_vec.into_iter().map(|(k, v)| (String::from(k), v)).collect()
+                        }
+                    ),
+                preceded(multispace0, char('}')),
+            )
+        )
+    )(i)
+}
+
+fn parse_identifiers(i: &str) -> IResult<&str, Vec<&str>> {
+    delimited(
+        multispace0,
+        many0(
+            preceded(space0, alt((alphanumeric1, escaped_string)))
+        ),
+        opt(space0)
+    )(i)
+}
+
+fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
+    let (rest, _) = many0(comment_one_line)(i)?; // ignore any comment lines
+
+    let (rest, identifiers) = parse_identifiers(rest)?;
     println!("identifiers: {:?}", identifiers);
 
-    let (rest, attributes): (&str, Vec<(String, AttributeType)>) = 
-        preceded(
-            char('{'),
-            preceded(multispace0,
-                terminated(
-                    map(
-                        separated_attributes, 
-                            |tuple_vec| {
-                                tuple_vec.into_iter().map(|(k, v)| (String::from(k), v)).collect()
-                            }
-                        ),
-                    preceded(multispace0, char('}')),
-                )
-            ),
-        )(rest)?;
+    let (rest, attributes) = basic_block(rest)?;
 
     println!("attributes: {:?}", attributes);
 
@@ -189,25 +242,98 @@ fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
     Ok((rest, block))
 }
 
-/// the root element
 #[allow(dead_code)]
 fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
     many0(
-        preceded(multispace0, tf_block)
+        preceded(
+            multispace0,
+            tf_block
+        )
     )(i)
 }
 
 // TODO: 
 // [√] parse multiple resources separated by blank lines
-// [ ] parse multiple resources separated by blank lines and comment lines
-// [ ] parse nested blocks
-// [ ] parse nested json blocks
+// [√] parse multiple resources separated by blank lines and comment lines
+// [√] parse nested blocks
+// [√] parse arrays
+// [√] parse nested json blocks
 // [ ] build relationships from templated attribute values
 // [ ] build relationships json values
+// [ ] parse whole files from cli
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_embedded_json() {
+        let data = r#"
+resource "aws_iam_role" "discovery_vpc-flow-log-role" {
+  name = "discovery_vpc-flow-log-role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "vpc-flow-logs.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+"#;
+        let (_, result) = root(data).unwrap();
+        let block = TerraformBlockWithTwoIdentifiers { 
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_iam_role"),
+            second_identifier: String::from("discovery_vpc-flow-log-role"),
+            attributes: vec![
+                Attribute { key: String::from("name"), value: AttributeType::Str(String::from("discovery_vpc-flow-log-role")) },
+                Attribute { key: String::from("assume_role_policy"), value: AttributeType::Json(
+                    JsonValue::Object(
+                        vec![
+                            (String::from("Version"), JsonValue::Str(String::from("2012-10-17"))),
+                            (String::from("Statement"), JsonValue::Array(
+                                vec![
+                                    JsonValue::Object(
+                                        vec![
+                                            (String::from("Sid"), JsonValue::Str(String::from(""))), 
+                                            (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
+                                            (String::from("Principal"), JsonValue::Object(
+                                                vec![
+                                                    (String::from("Service"), JsonValue::Str(String::from("vpc-flow-logs.amazonaws.com")))
+                                                ],
+                                            )),
+                                            (String::from("Action"), JsonValue::Str(String::from("sts:AssumeRole")))
+                                        ]
+                                    )
+                                ])
+                            ),
+                        ]
+                    )
+                )}
+            ] 
+        };
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block)];
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn array() {
+        let data = "[\"${aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn}\"]";
+        let (_, result) = parse_array(data).unwrap();
+        let expected = vec![
+            AttributeType::Str(String::from("${aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn}"))
+        ];
+        assert_eq!(result, expected)
+    }
 
     #[test]
     fn key_value_escaped_string() {
@@ -234,8 +360,96 @@ mod tests {
     }
 
     #[test]
+    fn array_attributes() {
+        let data = r#"
+resource "aws_cloudwatch_metric_alarm" "discovery_diff-engine-queue-cloudwatch-alaram-messages-high" {
+  alarm_name = "discovery_cloudwatch-diff-engine-queue-cloudwatch-alarm-messages-high"
+
+  alarm_actions = ["${aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn}"]
+}        
+"#;
+        let block = TerraformBlockWithTwoIdentifiers { 
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_cloudwatch_metric_alarm"),
+            second_identifier: String::from("discovery_diff-engine-queue-cloudwatch-alaram-messages-high"),
+            attributes: vec![
+                Attribute { key: String::from("alarm_name"), value: AttributeType::Str(String::from( "discovery_cloudwatch-diff-engine-queue-cloudwatch-alarm-messages-high")) },
+                Attribute { key: String::from("alarm_actions"), value: AttributeType::Array(
+                    vec![AttributeType::Str(String::from("${aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn}"))]
+                )}
+            ] 
+        };
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block)];
+        let (rest, result) = root(data).unwrap();
+        println!("rest: {}", rest);
+        assert_eq!(result, expected)
+    }
+
+    #[test]
     fn terraform_block() {
         let data = r#"
+# a line of comments to be ignored
+resource "aws_kms_key" "discovery_cache-master-key" {
+    description = "Master key used for creating/decrypting cache token data keys"
+    enable_key_rotation = true
+}
+"#;
+        let result = root(data);
+        let first_attr = Attribute {
+            key: String::from("description"),
+            value: AttributeType::Str(String::from("Master key used for creating/decrypting cache token data keys"))
+        };
+        let second_attr = Attribute {
+            key: String::from("enable_key_rotation"),
+            value: AttributeType::Boolean(true)
+        };
+        let block = TerraformBlockWithTwoIdentifiers {
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_kms_key"),
+            second_identifier: String::from("discovery_cache-master-key"),
+            attributes: vec![first_attr, second_attr]
+        };
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block)];
+        assert_eq!(result, Ok(("\n", expected)))
+    }
+
+    #[test]
+    fn terraform_parse_nested_block() {
+        let data = r#"
+resource "aws_cloudwatch_log_metric_filter" "discovery_diff-tagging-failed-event-error" {
+  name           = "diff_tagging_failed_event"
+
+  metric_transformation {
+    name      = "diff_tagging_failed_event"
+    namespace = "diff_tagging_log_metrics"
+    value     = "1"
+  }
+}
+"#;
+        let block = TerraformBlockWithTwoIdentifiers { 
+            block_type: String::from("resource"),
+            first_identifier: String::from("aws_cloudwatch_log_metric_filter"),
+            second_identifier: String::from("discovery_diff-tagging-failed-event-error"),
+            attributes: vec![
+                Attribute { key: String::from("name"), value: AttributeType::Str(String::from("diff_tagging_failed_event")) },
+                Attribute { key: String::from("metric_transformation"), value: AttributeType::Block(
+                    vec![
+                        (String::from("name"), AttributeType::Str(String::from("diff_tagging_failed_event"))), 
+                        (String::from("namespace"), AttributeType::Str(String::from("diff_tagging_log_metrics"))), (String::from("value"), AttributeType::Str(String::from("1")))
+                    ]
+                )}
+            ] 
+        };
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(block)];
+        let (_, result) = root(data).unwrap();
+        assert_eq!(result, expected)
+    }
+
+    #[test] 
+    fn terraform_block_with_comments() {
+        let data = r#"
+# a line of comments to be ignored
+# another line of comments to be ignored
 resource "aws_kms_key" "discovery_cache-master-key" {
     description = "Master key used for creating/decrypting cache token data keys"
     enable_key_rotation = true
