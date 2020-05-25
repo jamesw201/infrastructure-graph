@@ -37,6 +37,13 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [√] parse nested blocks
 [√] parse arrays
 [√] parse nested json blocks
+[√] parse serialised json blocks
+[ ] handle these: 
+```request_templates = { "application/json" = "{ \"statusCode\": 200 }" }```
+
+[ ] handle these: 
+```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```
+
 [ ] parse whole files from cli
 
 [ ] create json transform from AST
@@ -48,6 +55,9 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [ ] create security policies which run against the AST
 [ ] create react diagrams from the output of the AST
 
+[ ] show security violations on the react FE, overlays will highlight the offending resources
+and show a code snippet of the offending template lines
+
 [ ] deploy to lambda function
 [ ] query the AST
 [ ] create SRE pipeline including notebooks and Slack alarm posts
@@ -55,5 +65,3 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [ ] use machine learning to build intuitions based on the AST and supporting data
 [ ] show graph changes over time in React app
 [ ] create VR representaion of graph
-
-[ ] take over the world
