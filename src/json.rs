@@ -158,8 +158,6 @@ pub fn parse_json(i: &str) -> IResult<&str, JsonValue> {
     )(i)
 }
 
-// TODO: attempt to deserialise here by removing backslashes
-
 #[cfg(test)]
 mod tests {
     use super::*;

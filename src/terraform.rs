@@ -8,7 +8,6 @@ use nom::{
   error::{ParseError},
   multi::{many0, many1, separated_list0, fold_many0},
   number::complete::double,
-  regexp::str::{re_find},
   sequence::{delimited, preceded, separated_pair, terminated},
   IResult
 };
@@ -107,9 +106,7 @@ fn valid_identifier_char(c: char) -> bool {
 }
 
 fn valid_identifier(i: &str) -> IResult<&str, &str> {
-    let (rest, result) = take_while(valid_identifier_char)(i)?;
-    println!("result: {:?}", result);
-    Ok((rest, result))
+    take_while(valid_identifier_char)(i)
 }
 
 #[allow(dead_code)]
@@ -117,18 +114,29 @@ fn key_value(i: &str) -> IResult<&str, (&str, AttributeType)> {
     let (rest, result) = preceded(
         multispace0,
         alt((
+            separated_pair(
+                preceded(
+                    preceded(space0, char('\"')), 
+                    terminated(
+                        valid_identifier, 
+                        char('\"')
+                    )
+                ),
+                preceded(
+                    space0, 
+                    char('=')
+                ),
+                block_value
+            ),
             separated_pair(preceded(space0, valid_identifier), space0, block_value),
-            separated_pair(preceded(space0, delimited(tag("\""), valid_identifier, tag("\""))), preceded(space0, char('=')), block_value),
             separated_pair(preceded(space0, valid_identifier), preceded(space0, char('=')), block_value),
         ))
     )(i)?;
-    println!("key_value parsed: {:?}", result);
 
     Ok((rest, result))
 }
 
 fn json_value(i: &str) -> IResult<&str, JsonValue> {
-    // println!("json value: {}", i);
     let (rest, result) = preceded(
         multispace0, 
         preceded(
@@ -149,7 +157,6 @@ fn json_value(i: &str) -> IResult<&str, JsonValue> {
         )
     )(i)?;
 
-    // println!("json result: {:?}", result);
     Ok((rest, result))
 }
 
@@ -173,9 +180,6 @@ fn block_value(i: &str) -> IResult<&str, AttributeType> {
   )(i)
 }
 
-// TODO: 
-// [ ] handle these: request_templates = { "application/json" = "{ \"statusCode\": 200 }" }
-// [ ] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
 
 fn escaped_string(i: &str) -> IResult<&str, &str> {
     let (rest, result) = preceded(char('\"'), terminated(parse_single_line_str, char('\"')))(i)?;
@@ -233,8 +237,11 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
     }
 }
 
+fn inline_block(i: &str) -> IResult<&str, (&str, AttributeType)> {
+    delimited(preceded(space0, tag("{")), key_value, preceded(space0, tag("}")))(i)
+}
+
 fn basic_block(i: &str) -> IResult<&str, Vec<(String, AttributeType)>> {
-    println!("basic block: {}", i);
     preceded(
         char('{'),
         preceded(
@@ -277,7 +284,6 @@ fn tf_block(i: &str) -> IResult<&str, TerraformBlock> {
 }
 
 fn string_nl(i: &str) -> IResult<&str, &str> {
-    // preceded(space0, is_not("\r\n"))(i)
     let chars = "\r\n";
     take_while(move |c| !chars.contains(c))(i)
 }
@@ -324,6 +330,8 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
 // [√] parse arrays
 // [√] parse nested json blocks
 // [√] parse serialised json blocks
+// [√] handle these: request_templates = { "application/json" = "{ \"statusCode\": 200 }" }
+// [ ] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
 // [ ] parse whole files from cli
 // [ ] build relationships from templated attribute values
 // [ ] build relationships json values
@@ -331,6 +339,41 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inline_block_with_one_pair() {
+        let data = r#"{ "application/json" = "{ \"statusCode\": 200 }" }"#;
+        let result = inline_block(data);
+        let expected = Ok(("", ("application/json", AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))])))));
+        assert_eq!(result, expected)
+    }
+
+    #[test]
+    fn inline_block_resource() {
+        let data = r#"
+resource "aws_api_gateway_integration" "discovery_thing" {
+    request_templates = { "application/json" = "{ \"statusCode\": 200 }" }
+}
+"#;
+        let (_, result) = root(data).unwrap();
+        println!("inline_block_resource: {:?}", result);
+        let expected = vec![TerraformBlock::WithTwoIdentifiers(
+            TerraformBlockWithTwoIdentifiers {
+                block_type: String::from("resource"),
+                first_identifier: String::from("aws_api_gateway_integration"),
+                second_identifier: String::from("discovery_thing"),
+                attributes: vec![
+                    Attribute {
+                        key: String::from("request_templates"),
+                        value: AttributeType::Block(vec![
+                            (String::from("application/json"), AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))])))
+                        ]
+                    )
+                }]
+            }
+        )];
+        assert_eq!(result, expected)
+    }
 
     #[test]
     fn parse_serialised_policy_strings() {

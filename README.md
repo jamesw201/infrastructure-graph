@@ -38,22 +38,27 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [√] parse arrays
 [√] parse nested json blocks
 [√] parse serialised json blocks
-[ ] handle these: 
+[√] handle inline blocks:
 ```request_templates = { "application/json" = "{ \"statusCode\": 200 }" }```
 
-[ ] handle these: 
+[ ] handle built-in functions:
 ```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```
 
 [ ] parse whole files from cli
 
 [ ] create json transform from AST
-[ ] create rdf transform from AST
 
 [ ] build relationships from templated attribute values
 [ ] build relationships from json values
 
-[ ] create security policies which run against the AST
 [ ] create react diagrams from the output of the AST
+
+[ ] handle templated expressions explicitely
+[ ] refactor the terraform/json structs to bring them into line with each other
+
+[ ] create security policies which run against the AST
+
+[ ] create rdf transform from AST
 
 [ ] show security violations on the react FE, overlays will highlight the offending resources
 and show a code snippet of the offending template lines
