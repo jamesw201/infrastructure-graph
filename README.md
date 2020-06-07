@@ -41,7 +41,9 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [√] handle inline blocks:
 ```request_templates = { "application/json" = "{ \"statusCode\": 200 }" }```
 
-[ ] handle built-in functions:
+[√] parse templated strings ```"${value.here}"```
+
+[x] handle built-in functions:
 ```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```
 
 [ ] parse whole files from cli

@@ -8,7 +8,7 @@ use nom::{
   error::{ParseError},
   multi::{many0, many1, separated_list0, fold_many0},
   number::complete::double,
-  sequence::{delimited, preceded, separated_pair, terminated},
+  sequence::{delimited, preceded, pair, separated_pair, terminated},
   IResult
 };
 
@@ -16,16 +16,34 @@ use crate::json::{JsonValue, parse_json};
 
 use std::str;
 
+// #[derive(PartialEq, Debug, Clone)]
+// pub enum BuiltInFunctionParam {
+//     Path(String),
+//     InnerFunction(Box<BuiltInFunction>),
+// }
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct BuiltInFunction {
+    name: String,
+    param: TemplateString,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum TemplateString {
+    Variable(String),
+    BuiltInFunction(Box<BuiltInFunction>),
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum AttributeType {
     Str(String),
-    TemplateString(String),
+    TemplatedString(TemplateString),
     Boolean(bool),
     Num(f64),
     Array(Vec<AttributeType>),
     Block(Vec<(String, AttributeType)>),
     TFBlock(TerraformBlock),
-    Json(JsonValue)
+    Json(JsonValue),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -168,6 +186,7 @@ fn block_value(i: &str) -> IResult<&str, AttributeType> {
   preceded(
     space0,
     alt((
+      map(templated_string, AttributeType::TemplatedString),
       map(serialised_json, AttributeType::Json),
       map(boolean, AttributeType::Boolean),
       map(double, AttributeType::Num),
@@ -179,7 +198,6 @@ fn block_value(i: &str) -> IResult<&str, AttributeType> {
     )),
   )(i)
 }
-
 
 fn escaped_string(i: &str) -> IResult<&str, &str> {
     let (rest, result) = preceded(char('\"'), terminated(parse_single_line_str, char('\"')))(i)?;
@@ -206,12 +224,12 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                 )
             } else {
                 TerraformBlock::WithOneIdentifier(
-                TerraformBlockWithOneIdentifier {
-                    block_type: String::from("inner"),
-                    first_identifier: identifiers[0].to_string(),
-                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
-                }
-            )    
+                    TerraformBlockWithOneIdentifier {
+                        block_type: String::from("inner"),
+                        first_identifier: identifiers[0].to_string(),
+                        attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                    }
+                )
             }
         },
         2 => {
@@ -323,6 +341,78 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
     )(i)
 }
 
+// TODO: finish this idea!
+// all things that can exist in a templated string ${}
+// fn templated_value(i: &str) -> IResult<&str, TemplateString> {
+//     alt((
+//         map(built_in_function, TemplateString::BuiltInFunction),
+//         map(valid_template_string, TemplateString::Variable),
+//     ))(i)
+// }
+
+fn built_in_function(i: &str) -> IResult<&str, TemplateString> {
+    // println!("built_in_function input: {}", i);
+
+    // peek for brackets
+    let (rest, result) = many0(
+            pair(
+            alphanumeric1, 
+            delimited(
+                char('('), 
+                valid_template_string,
+                char(')')
+            ),
+        )
+    )(i)?;
+    // TODO: use the same pattern that block_value uses to limit number 
+    // of things we can search for in a recursive structure
+
+    // println!("result.0 type: {:?}, result.1 type: {:?}", result.0.type_name(), result.1.type_name());
+    // println!("built_in_function rest: {:?}, result: {:?}", rest, result);
+
+    // let blarp = if i.contains("(") {
+    //     let blap: BuiltInFunction = result.1;
+
+    //     BuiltInFunction {
+    //         name: String::from(result.0),
+    //         param: TemplateString::BuiltInFunction(Box::new(blap))
+    //     };
+    // } else {
+    //     let bleep: TemplateString = result.1;
+    //     println!("found string: {:?}", bleep);
+    // };
+
+    let blarp = TemplateString::Variable(String::from(""));
+    Ok((rest, blarp))
+}
+
+fn valid_template_string_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '/' || c == '.' || c == '(' || c == ')' || c == '\"'
+}
+
+fn valid_template_string(i: &str) -> IResult<&str, TemplateString> {
+    // println!("valid_template_string input: {}", i);
+    // let (rest, result) = delimited(tag("\""), take_while(valid_template_string_char), tag("\""))(i)?;
+    let (rest, result) = take_while(valid_template_string_char)(i)?;
+    let blarp = TemplateString::Variable(String::from(result));
+
+    // println!("string result: {:?}", result);
+    // Ok((rest, result))
+    Ok((rest, blarp))
+}
+
+fn templated_string(i: &str) -> IResult<&str, TemplateString> {
+    // println!("templated_string: {:?}", i);
+
+    let (rest, result) = preceded(
+        preceded(space0, tag("\"${")),
+        terminated(valid_template_string, tag("}\""))
+    )(i)?;
+    
+    // println!("templated rest: {:?}, result: {:?}", rest, result);
+    Ok((rest, result))
+}
+
 // TODO: 
 // [√] parse multiple resources separated by blank lines
 // [√] parse multiple resources separated by blank lines and comment lines
@@ -331,6 +421,7 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
 // [√] parse nested json blocks
 // [√] parse serialised json blocks
 // [√] handle these: request_templates = { "application/json" = "{ \"statusCode\": 200 }" }
+// [ ] parse templated strings
 // [ ] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
 // [ ] parse whole files from cli
 // [ ] build relationships from templated attribute values
@@ -339,6 +430,40 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn templated_string_test() {
+        let data = "${someVariable}";
+        let expected = TemplateString::Variable(String::from("someVariable"));
+        let result = templated_string(data).unwrap();
+
+        assert_eq!(result, ("}", expected))
+    }
+
+    #[test]
+    fn built_in_function_test() {
+        // TODO: create stuct for built-in function that can contain an enum which is either 
+        // a built-in function or a string
+        let data = r#""${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}""#;
+        let result = templated_string(data).unwrap();
+        assert_eq!(1, 2)
+    }
+
+    #[test]
+    fn built_in_function_in_resource() {
+        // TODO: create stuct for built-in function that can contain an enum which is either 
+        // a built-in function or a string
+        let data = r#"
+resource "aws_s3_bucket_object" "discovery_cpsc-vmware-config" {
+    bucket               = "acp-platform-s-discovery-sandbox1"
+    source               = "/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"
+    etag                 = "${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}"
+    key                  = "default-config/cpsc-vmware-config.json"
+}
+"#;
+        let result = root(data).unwrap();
+        assert_eq!(1, 2)
+    }
 
     #[test]
     fn inline_block_with_one_pair() {
@@ -356,7 +481,7 @@ resource "aws_api_gateway_integration" "discovery_thing" {
 }
 "#;
         let (_, result) = root(data).unwrap();
-        println!("inline_block_resource: {:?}", result);
+        // println!("inline_block_resource: {:?}", result);
         let expected = vec![TerraformBlock::WithTwoIdentifiers(
             TerraformBlockWithTwoIdentifiers {
                 block_type: String::from("resource"),
@@ -536,24 +661,24 @@ resource "aws_kms_key" "discovery_cache-master-key" {
 //         assert_eq!(1, 2)
 //     }
 
-//     #[test]
-//     fn string_test() {
-//         let data = r#""= 0.11.2"
-// backend "s3" {
-//     bucket  = "acp-platform-s-discovery-sandbox1"
-//     key     = "infrastructure/terraform.tfstate"
-//     region  = "us-east-1"
-//   }
-// }"#;
-//         let result = escaped_string(data).unwrap();
-//         assert_eq!(result, (r#"
-// backend "s3" {
-//     bucket  = "acp-platform-s-discovery-sandbox1"
-//     key     = "infrastructure/terraform.tfstate"
-//     region  = "us-east-1"
-//   }
-// }"#, "= 0.11.2"))
-//     }
+    #[test]
+    fn string_test() {
+        let data = r#""= 0.11.2"
+backend "s3" {
+    bucket  = "acp-platform-s-discovery-sandbox1"
+    key     = "infrastructure/terraform.tfstate"
+    region  = "us-east-1"
+  }
+}"#;
+        let result = escaped_string(data).unwrap();
+        assert_eq!(result, (r#"
+backend "s3" {
+    bucket  = "acp-platform-s-discovery-sandbox1"
+    key     = "infrastructure/terraform.tfstate"
+    region  = "us-east-1"
+  }
+}"#, "= 0.11.2"))
+    }
 
 
 //     #[test]
@@ -602,38 +727,38 @@ resource "aws_kms_key" "discovery_cache-master-key" {
 //         assert_eq!(1,2)
 //     }
 
-//     #[test]
-//     fn nested_block_with_an_identifier() {
-//         let data = r#"
-// terraform {
-//   required_version = "= 0.11.2"
-//   backend "s3" {
-//     bucket  = "acp-platform-s-discovery-sandbox1"
-//     key     = "infrastructure/terraform.tfstate"
-//     region  = "us-east-1"
-//   }
-// }
-// "#;
-//         let (_, result) = root(data).unwrap();
-//         let block = TerraformBlockWithNoIdentifiers { 
-//             block_type: String::from("terraform"),
-//             attributes: vec![
-//                 Attribute { key: String::from("required_version"), value: AttributeType::Str(String::from("= 0.11.2")) },
-//                 Attribute { key: String::from("backend"), value: AttributeType::TFBlock(TerraformBlock::WithOneIdentifier(TerraformBlockWithOneIdentifier {
-//                     block_type: String::from("inner"),
-//                     first_identifier: String::from("s3"),
-//                     attributes: vec![
-//                         Attribute { key: String::from("bucket"), value: AttributeType::Str(String::from("acp-platform-s-discovery-sandbox1")) },
-//                         Attribute { key: String::from("key"), value: AttributeType::Str(String::from("infrastructure/terraform.tfstate")) },
-//                         Attribute { key: String::from("region"), value: AttributeType::Str(String::from("us-east-1")) }
-//                     ]
-//                 }))}
-//             ]
-//         };
+    #[test]
+    fn nested_block_with_an_identifier() {
+        let data = r#"
+terraform {
+  required_version = "= 0.11.2"
+  backend "s3" {
+    bucket  = "acp-platform-s-discovery-sandbox1"
+    key     = "infrastructure/terraform.tfstate"
+    region  = "us-east-1"
+  }
+}
+"#;
+        let (_, result) = root(data).unwrap();
+        let block = TerraformBlockWithNoIdentifiers { 
+            block_type: String::from("terraform"),
+            attributes: vec![
+                Attribute { key: String::from("required_version"), value: AttributeType::Str(String::from("= 0.11.2")) },
+                Attribute { key: String::from("backend"), value: AttributeType::TFBlock(TerraformBlock::WithOneIdentifier(TerraformBlockWithOneIdentifier {
+                    block_type: String::from("inner"),
+                    first_identifier: String::from("s3"),
+                    attributes: vec![
+                        Attribute { key: String::from("bucket"), value: AttributeType::Str(String::from("acp-platform-s-discovery-sandbox1")) },
+                        Attribute { key: String::from("key"), value: AttributeType::Str(String::from("infrastructure/terraform.tfstate")) },
+                        Attribute { key: String::from("region"), value: AttributeType::Str(String::from("us-east-1")) }
+                    ]
+                }))}
+            ]
+        };
 
-//         let expected = vec![TerraformBlock::NoIdentifiers(block)];
-//         assert_eq!(result, expected)
-//     }
+        let expected = vec![TerraformBlock::NoIdentifiers(block)];
+        assert_eq!(result, expected)
+    }
 
 //     #[test]
 //     fn parse_comments_and_blank_lines() {
