@@ -1,5 +1,12 @@
 #[cfg_attr(test, macro_use)] extern crate serde_json;
+use structopt::StructOpt;
+
+use std::time::{Instant};
+use exitfailure::ExitFailure;
+
 use rust_nom_json::*;
+use rust_nom_json::visitors::resource_visitor;
+
 
 mod terraform;
 
@@ -10,24 +17,45 @@ mod terraform;
 // [√] use that trait to mock responses, enabling TDD for applications with side effects  
 // [√] make sure that errors are transformed into some kind of standard Error
 
-fn main() {
-    let client = http_client::HttpClient;
-    let service = ip_service::IPService::new(client);
-
-    // settled with unwrap after failing to use ? or await: https://github.com/seanmonstar/reqwest/issues/275
-    let bla = service.call_api().unwrap();
-    println!("api: {:#?}", bla);
-
-    let f = foo::Foo::new("hello");
-    println!("{:?}", f);
-
-    let parser = cloud_template_parser::CloudTemplateParser::new();
-    parser.handle(vec![String::from("example_files/basic.tf")]);
+/// Search for a pattern in a file and display the lines that contain it.
+#[derive(StructOpt)]
+struct Cli {
+    /// The path to the file to read
+    #[structopt(parse(from_os_str))]
+    path: std::path::PathBuf,
 }
 
-// TODO: 
-// [√] read Terraform files in
-// [√] begin nom parsing on files
+fn main() -> Result<(), ExitFailure> {
+    let start = Instant::now();
+    let args = Cli::from_args();
+    
+    // let client = http_client::HttpClient;
+    // let service = ip_service::IPService::new(client);
+
+    // // settled with unwrap after failing to use ? or await: https://github.com/seanmonstar/reqwest/issues/275
+    // let bla = service.call_api().unwrap();
+    // println!("api: {:#?}", bla);
+
+    // let f = foo::Foo::new("hello");
+    // println!("{:?}", f);
+
+    let parser = cloud_template_parser::CloudTemplateParser::new();
+    let result = parser.handle(args.path);
+    // TODO: 
+    // [ ] parse result with iterator/visitors
+    let json = resource_visitor::dispatch(&result);
+    // iterate over array, use match statement to get initial visitor right
+    // then allow Visitor pattern to do the rest
+    let elapsed_before_printing = start.elapsed();
+
+    println!("json: {:?}", json);
+    // println!("ast: {:?}", result);
+
+    let duration = start.elapsed();
+    println!("Terraform parsed in: {:?}", elapsed_before_printing);
+    println!("Terraform printed to stdout in: {:?}", duration);
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {

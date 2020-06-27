@@ -16,16 +16,11 @@ use crate::json::{JsonValue, parse_json};
 
 use std::str;
 
-// #[derive(PartialEq, Debug, Clone)]
-// pub enum BuiltInFunctionParam {
-//     Path(String),
-//     InnerFunction(Box<BuiltInFunction>),
-// }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct BuiltInFunction {
-    name: String,
-    param: TemplateString,
+    pub name: String,
+    pub param: TemplateString,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -41,15 +36,15 @@ pub enum AttributeType {
     Boolean(bool),
     Num(f64),
     Array(Vec<AttributeType>),
-    Block(Vec<(String, AttributeType)>),
+    Block(Vec<Attribute>),
     TFBlock(TerraformBlock),
     Json(JsonValue),
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Attribute {
-    key: String,
-    value: AttributeType
+    pub key: String,
+    pub value: AttributeType
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -61,23 +56,23 @@ pub enum TerraformBlock {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct TerraformBlockWithNoIdentifiers {
-    block_type: String,
-    attributes: Vec<Attribute>
+    pub block_type: String,
+    pub attributes: Vec<Attribute>
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct TerraformBlockWithOneIdentifier {
-    block_type: String,
-    first_identifier: String,
-    attributes: Vec<Attribute>
+    pub block_type: String,
+    pub first_identifier: String,
+    pub attributes: Vec<Attribute>
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct TerraformBlockWithTwoIdentifiers {
-    block_type: String,
-    first_identifier: String,
-    second_identifier: String,
-    attributes: Vec<Attribute>
+    pub block_type: String,
+    pub first_identifier: String,
+    pub second_identifier: String,
+    pub attributes: Vec<Attribute>
 }
 
 
@@ -211,7 +206,7 @@ fn separated_attributes(i: &str) -> IResult<&str, Vec<(&str, AttributeType)>> {
     separated_list0(preceded(space0, newline), key_value)(i)
 }
 
-fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType)>) -> TerraformBlock {
+fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<Attribute>) -> TerraformBlock {
     match identifiers.len() {
         1 => {
             let block_types = ["resource", "provider", "data", "terraform", "variable"];
@@ -219,7 +214,7 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                 TerraformBlock::NoIdentifiers(
                     TerraformBlockWithNoIdentifiers {
                         block_type: identifiers[0].to_string(),
-                        attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                        attributes
                     }
                 )
             } else {
@@ -227,7 +222,7 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                     TerraformBlockWithOneIdentifier {
                         block_type: String::from("inner"),
                         first_identifier: identifiers[0].to_string(),
-                        attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                        attributes
                     }
                 )
             }
@@ -237,7 +232,7 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                 TerraformBlockWithOneIdentifier {
                     block_type: identifiers[0].to_string(),
                     first_identifier: identifiers[1].to_string(),
-                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                    attributes
                 }
             )
         },
@@ -247,7 +242,7 @@ fn build_tf_block(identifiers: Vec<&str>, attributes: Vec<(String, AttributeType
                     block_type: identifiers[0].to_string(),
                     first_identifier: identifiers[1].to_string(),
                     second_identifier: identifiers[2].to_string(),
-                    attributes: attributes.into_iter().map(|(key, value)| Attribute{key, value}).collect()
+                    attributes
                 }
             )
         },
@@ -259,7 +254,7 @@ fn inline_block(i: &str) -> IResult<&str, (&str, AttributeType)> {
     delimited(preceded(space0, tag("{")), key_value, preceded(space0, tag("}")))(i)
 }
 
-fn basic_block(i: &str) -> IResult<&str, Vec<(String, AttributeType)>> {
+fn basic_block(i: &str) -> IResult<&str, Vec<Attribute>> {
     preceded(
         char('{'),
         preceded(
@@ -268,7 +263,7 @@ fn basic_block(i: &str) -> IResult<&str, Vec<(String, AttributeType)>> {
                 map(
                     separated_attributes, 
                         |tuple_vec| { // tempted to see if we can do without this mapping
-                            tuple_vec.into_iter().map(|(k, v)| (String::from(k), v)).collect()
+                            tuple_vec.into_iter().map(|(k, v)| Attribute{key: String::from(k), value: v}).collect()
                         }
                     ),
                 preceded(multispace0, char('}')),
@@ -421,9 +416,9 @@ fn templated_string(i: &str) -> IResult<&str, TemplateString> {
 // [√] parse nested json blocks
 // [√] parse serialised json blocks
 // [√] handle these: request_templates = { "application/json" = "{ \"statusCode\": 200 }" }
-// [ ] parse templated strings
-// [ ] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
-// [ ] parse whole files from cli
+// [√] parse templated strings
+// [x] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
+// [√] parse whole files from cli
 // [ ] build relationships from templated attribute values
 // [ ] build relationships json values
 
@@ -491,7 +486,10 @@ resource "aws_api_gateway_integration" "discovery_thing" {
                     Attribute {
                         key: String::from("request_templates"),
                         value: AttributeType::Block(vec![
-                            (String::from("application/json"), AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))])))
+                            Attribute {
+                                key: String::from("application/json"), 
+                                value: AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))]))
+                            }
                         ]
                     )
                 }]
@@ -529,7 +527,13 @@ resource "aws_sqs_queue" "discovery_collector-queue" {
                             (String::from("maxReceiveCount"), JsonValue::Num(2.0))]))
                     },
                     Attribute {
-                        key: String::from("tags"), value: AttributeType::Block(vec![(String::from("Environment"), AttributeType::Str(String::from("sandbox1")))])
+                        key: String::from("tags"), 
+                        value: AttributeType::Block(vec![(
+                            Attribute {
+                                key: String::from("Environment"), 
+                                value: AttributeType::Str(String::from("sandbox1"))
+                            }
+                            )])
                     }
                 ]
             }

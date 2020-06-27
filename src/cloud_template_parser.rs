@@ -31,10 +31,10 @@ impl CloudTemplateParser {
         CloudTemplateParser {}
     }
 
-    pub fn handle(&self, filenames: Vec<String>) -> Vec<TerraformBlock> {
+    pub fn handle(&self, filename: std::path::PathBuf) -> Vec<TerraformBlock> {
         // let contents = fs::read_to_string("example_files/discovery-minus-bad-bits.tf")
         //     .expect("Something went wrong reading the file");
-        let contents = fs::read_to_string("example_files/discovery.tf")
+        let contents = fs::read_to_string(filename)
             .expect("Something went wrong reading the file");
 
         let (_, result) = root(contents.as_str()).unwrap();

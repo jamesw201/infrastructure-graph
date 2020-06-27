@@ -24,6 +24,8 @@ Creating this project in Rust will hopefully provide optimal execution times.
 
 # Notes
 - Build it initially as a cli app with local policies (a bit like cloud-custodian but offline).
+- Parse cloud-custodian policies and turn them into AST-like structure. This way the tool can even do checks on the Policies to ensure they are sound.
+- End-goal: have a separate repo for policies which builds a binary of them. This can then be pulled each time the tool is run to get up to date Policies.
 
 
 # Tasks
@@ -46,16 +48,17 @@ Creating this project in Rust will hopefully provide optimal execution times.
 [x] handle built-in functions:
 ```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```
 
-[ ] parse whole files from cli
+[√] parse whole files from cli
 
-[ ] create json transform from AST
+[√] create chainable visitor pattern and implementation
+
+[√] create json transform from AST
 
 [ ] build relationships from templated attribute values
 [ ] build relationships from json values
 
 [ ] create react diagrams from the output of the AST
 
-[ ] handle templated expressions explicitely
 [ ] refactor the terraform/json structs to bring them into line with each other
 
 [ ] create security policies which run against the AST

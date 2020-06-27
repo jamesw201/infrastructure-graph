@@ -7,3 +7,4 @@ pub mod cloud_template_parser;
 pub mod nom_parsers;
 pub mod terraform;
 pub mod json;
+pub mod visitors;
