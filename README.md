@@ -71,12 +71,12 @@ cargo build --release
 [ ] show security violations on the react FE, overlays will highlight the offending resources
 and show a code snippet of the offending template lines
 
-[ ] deploy to lambda function
-[ ] query the AST
-[ ] create SRE pipeline including notebooks and Slack alarm posts
+[ ] deploy to lambda function  
+[ ] query the AST  
+[ ] create SRE pipeline including notebooks and Slack alarm posts  
 
 [ ] refactor the terraform/json structs to bring them into line with each other
 
-[ ] use machine learning to build intuitions based on the AST and supporting data
-[ ] show graph changes over time in React app
-[ ] create VR representaion of graph
+[ ] use machine learning to build intuitions based on the AST and supporting data  
+[ ] show graph changes over time in React app  
+[ ] create VR representaion of graph  
