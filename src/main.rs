@@ -1,5 +1,8 @@
 #[cfg_attr(test, macro_use)] extern crate serde_json;
 use structopt::StructOpt;
+use std::collections::HashMap;
+extern crate serde_yaml;
+use serde::{Deserialize};
 
 use std::time::{Instant};
 use exitfailure::ExitFailure;
@@ -7,6 +10,7 @@ use exitfailure::ExitFailure;
 use rust_nom_json::*;
 use rust_nom_json::visitors::resource_visitor;
 
+use rust_nom_json::visitors::relationship_visitor::Relationship;
 
 mod terraform;
 
@@ -39,13 +43,18 @@ fn main() -> Result<(), ExitFailure> {
     // let f = foo::Foo::new("hello");
     // println!("{:?}", f);
 
+    // TODO: 
+    // [√] load relationship yaml
+    let f = std::fs::File::open("./example_files/aws_relationships.yaml")?;
+    let aws_relationship_specs: HashMap<String, Relationship> = serde_yaml::from_reader(f)?;
+    // println!("Read YAML string: {:?}", aws_relationship_specs);
+
     let parser = cloud_template_parser::CloudTemplateParser::new();
     let result = parser.handle(args.path);
-    // TODO: 
-    // [ ] parse result with iterator/visitors
-    let json = resource_visitor::dispatch(&result);
-    // iterate over array, use match statement to get initial visitor right
-    // then allow Visitor pattern to do the rest
+
+    let json = resource_visitor::dispatch(&result, aws_relationship_specs);
+    // // iterate over array, use match statement to get initial visitor right
+    // // then allow Visitor pattern to do the rest
     let elapsed_before_printing = start.elapsed();
 
     println!("json: {:?}", json);

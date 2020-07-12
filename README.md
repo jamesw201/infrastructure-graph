@@ -5,6 +5,12 @@ This project will parse deployment templates (Terraform, Cloudformation) to gene
 
 Creating this project in Rust will hopefully provide optimal execution times.
 
+How to run:
+```
+cargo run -- ./example_files/discovery.tf > json_output.txt
+./target/release/rust_nom_json example_files/discovery.tf > json_output.txt
+```
+
 ## Design
 #### CloudTemplateParser -> (nodes)
   - Reads in (Terraform, Cloudformation) templates -- might be replaced by separate FileReader Entity at some point.
@@ -59,8 +65,6 @@ Creating this project in Rust will hopefully provide optimal execution times.
 
 [ ] create react diagrams from the output of the AST
 
-[ ] refactor the terraform/json structs to bring them into line with each other
-
 [ ] create security policies which run against the AST
 
 [ ] create rdf transform from AST
@@ -71,6 +75,8 @@ and show a code snippet of the offending template lines
 [ ] deploy to lambda function
 [ ] query the AST
 [ ] create SRE pipeline including notebooks and Slack alarm posts
+
+[ ] refactor the terraform/json structs to bring them into line with each other
 
 [ ] use machine learning to build intuitions based on the AST and supporting data
 [ ] show graph changes over time in React app

@@ -3,6 +3,7 @@
 // Useful articles on the Visitor pattern:
 // https://michael-f-bryan.github.io/calc/book/html/parse/visit.html
 // https://www.lihaoyi.com/post/ZeroOverheadTreeProcessingwiththeVisitorPattern.html
+use std::cell::RefCell;
 
 use crate::terraform::{
     TerraformBlock,
@@ -25,32 +26,25 @@ use crate::json::{
     JsonValue
 };
 
-// perhaps the User like wants a json output with relationships and policy results,
-// so that they can be inspected in a diagram.
+use crate::relationship_finders::relationship_finder::{RelationshipFinder};
+use crate::visitors::visitor::{ PolicyEvaluator, Visitor };
+use crate::visitors::relationship_visitor::Relationship;
 
-pub trait Visitor<T> {
-    fn visit_str(&self, value: &String) -> T;
-    fn visit_template_string(&self, value: &TemplateString) -> T;
-    fn visit_boolean(&self, value: &bool) -> T;
-    fn visit_num(&self, value: &f64) -> T;
-    fn visit_block(&self, value: &Vec<Attribute>) -> T;
-    fn visit_array(&self, value: &Vec<AttributeType>) -> T;
-    fn visit_tfblock(&self, value: &TerraformBlock) -> T;
-    fn visit_attribute(&self, value: &Attribute) -> T;
-    fn visit_json(&self, value: &JsonValue) -> T;
-    fn visit_json_array(&self, value: &Vec<JsonValue>) -> T;
-    fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> T;
+
+pub struct JsonVisitor {
+    pub relationships: RefCell<Vec<Relationship>>,
 }
 
+impl RelationshipFinder for JsonVisitor {
+    fn add_relationship(&self, relationship: Relationship) {
+        self.relationships.borrow_mut().push(relationship);
+    }
 
-// TODO: something like this could allow for us to save results for each Visitor implementation.
-// pub struct JsonVisitor{
-//     relationships: Vec<String>,
-//     policy_results: Vec<String>,
-//     body: Vec<String>
-// }
-
-pub struct JsonVisitor;
+    fn output_relationships(&self) -> String {
+        let joined_relationships = self.relationships.borrow().iter().map(|rel| format!("{}", rel)).collect::<Vec<String>>().join(",");
+        format!("[{}]", joined_relationships)
+    }
+}
 
 impl Visitor<String> for JsonVisitor {
     fn visit_str(&self, value: &String) -> String {
@@ -240,7 +234,9 @@ mod tests {
             }
         );
         let expected = String::from(r#"{"type":"resource","name":"thing1","body":{"backend":"s3","bookend":"true"}}"#);
-        let result = JsonVisitor.visit_tfblock(&resource1);
+        let mut vec = Vec::new();
+        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
 
@@ -262,7 +258,9 @@ mod tests {
             }
         );
         let expected = String::from(r#"{"type":"aws_sqs_queue","name":"discovery_collector-queue","body":{"policy":{"deadLetterTargetArn":"${aws_sqs_queue.discovery_collector-deadletter-queue.arn}","maxReceiveCount":"2.0"}}}"#);
-        let result = JsonVisitor.visit_tfblock(&resource1);
+        let mut vec = Vec::new();
+        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
 
@@ -285,7 +283,9 @@ mod tests {
             }
         );
         let expected = String::from(r#"{"type":"aws_cloudwatch_metric_alarm","name":"discovery_diff-engine-queue-cloudwatch-alaram-messages-high","body":{"alarm_name":"discovery_cloudwatch-diff-engine-queue-cloudwatch-alarm-messages-high","alarm_actions":["aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn","aws_appautoscaling_policy.discovery_diff-engine-autoscaling-down.arn"]}}"#);
-        let result = JsonVisitor.visit_tfblock(&resource1);
+        let mut vec = Vec::new();
+        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
 
@@ -319,7 +319,9 @@ mod tests {
         );
 
         let expected = String::from(r#"{"type":"aws_cloudwatch_log_metric_filter","name":"discovery_diff-tagging-failed-event-error","body":{"name":"diff_tagging_failed_event","metric_transformation":{"name":"diff_tagging_failed_event","namespace":"diff_tagging_log_metrics","value":"1"}}}"#);
-        let result = JsonVisitor.visit_tfblock(&resource1);
+        let mut vec = Vec::new();
+        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
 }

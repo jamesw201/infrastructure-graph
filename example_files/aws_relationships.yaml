@@ -1,0 +1,20 @@
+# a list of relationships
+sns_topic_subscription:
+    source: endpoint
+    target: topic_arn
+    label: "subscribes"
+
+aws_lambda_permission:
+    source: source_arn
+    target: function_name
+    label: action
+
+aws_lambda_event_source_mapping:
+    source: event_source_arn
+    target: function_name
+    label: ""
+
+aws_iam_role_policy:
+    source: event_source_arn
+    target: function_name
+    label: ""
