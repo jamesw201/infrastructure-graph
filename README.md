@@ -8,6 +8,8 @@ Creating this project in Rust will hopefully provide optimal execution times.
 How to run:
 ```
 cargo run -- ./example_files/discovery.tf > json_output.txt
+
+cargo build --release
 ./target/release/rust_nom_json example_files/discovery.tf > json_output.txt
 ```
 
@@ -40,27 +42,27 @@ cargo run -- ./example_files/discovery.tf > json_output.txt
 [√] read in files
 [√] translate our first template resource into a struct
 
-[√] parse multiple resources separated by blank lines
-[√] parse multiple resources separated by blank lines and comment lines
-[√] parse nested blocks
-[√] parse arrays
-[√] parse nested json blocks
-[√] parse serialised json blocks
-[√] handle inline blocks:
-```request_templates = { "application/json" = "{ \"statusCode\": 200 }" }```
+[√] parse multiple resources separated by blank lines  
+[√] parse multiple resources separated by blank lines and comment lines  
+[√] parse nested blocks  
+[√] parse arrays  
+[√] parse nested json blocks  
+[√] parse serialised json blocks  
+[√] handle inline blocks:  
+```request_templates = { "application/json" = "{ \"statusCode\": 200 }" }```  
 
-[√] parse templated strings ```"${value.here}"```
+[√] parse templated strings ```"${value.here}"```  
 
-[x] handle built-in functions:
-```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```
+[x] handle built-in functions:  
+```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```  
 
-[√] parse whole files from cli
+[√] parse whole files from cli  
 
-[√] create chainable visitor pattern and implementation
+[√] create chainable visitor pattern and implementation  
 
-[√] create json transform from AST
+[√] create json transform from AST  
 
-[ ] build relationships from templated attribute values
+[√] build relationships from templated attribute values  
 [ ] build relationships from json values
 
 [ ] create react diagrams from the output of the AST
