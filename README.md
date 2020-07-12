@@ -57,11 +57,8 @@ cargo build --release
 ```etag = "${md5(file("default-config/cpsc-vmware-config.json"))}"```  
 
 [√] parse whole files from cli  
-
 [√] create chainable visitor pattern and implementation  
-
 [√] create json transform from AST  
-
 [√] build relationships from templated attribute values  
 [ ] build relationships from json values
 
