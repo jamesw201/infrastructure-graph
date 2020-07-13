@@ -59,6 +59,7 @@ cargo build --release
 [√] parse whole files from cli  
 [√] create chainable visitor pattern and implementation  
 [√] create json transform from AST  
+[√] get relationship specs from yaml  
 [√] build relationships from templated attribute values  
 [ ] build relationships from json values
 

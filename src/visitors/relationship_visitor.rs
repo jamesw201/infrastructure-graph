@@ -56,6 +56,7 @@ impl RelationshipVisitor {
                     _ => String::from("")
                 }
             },
+            // TODO: match on Str() for ARNs which were not templated
             Some(_) => String::from(""),
             None => String::from("")
         }
@@ -132,9 +133,6 @@ impl Visitor<String> for RelationshipVisitor {
             ) => {
                 match self.aws_relationship_specs.get(first_identifier) {
                     Some(Relationship { source, target, label }) => {
-                        // search through attributes for appropriate fields
-                        let rel = Relationship { source: source.to_string(), target: target.to_string(), label: label.to_string() };
-
                         let source = attributes.into_iter().find(|&attr| attr.key == source.to_string());
                         let target = attributes.into_iter().find(|&attr| attr.key == target.to_string());
 
