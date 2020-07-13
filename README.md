@@ -37,10 +37,10 @@ cargo build --release
 
 
 # Tasks
-[√] build basic tests for the CloudTemplateParser construct
-[√] build skeleton entities for the CloudTemplateParser construct
-[√] read in files
-[√] translate our first template resource into a struct
+[√] build basic tests for the CloudTemplateParser construct  
+[√] build skeleton entities for the CloudTemplateParser construct  
+[√] read in files  
+[√] translate our first template resource into a struct  
 
 [√] parse multiple resources separated by blank lines  
 [√] parse multiple resources separated by blank lines and comment lines  
