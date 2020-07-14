@@ -61,6 +61,7 @@ cargo build --release
 [√] create json transform from AST  
 [√] get relationship specs from yaml  
 [√] build relationships from templated attribute values  
+[ ] build mechanism for traversing AST by simple jmespath expressions  
 [ ] build relationships from json values
 
 [ ] create react diagrams from the output of the AST
