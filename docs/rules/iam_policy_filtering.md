@@ -22,18 +22,9 @@ With data:
   }
 }
 ```
-
+There isn't a good way to in CloudCustodian to filter multiple attributes in objects in a collection. So making a `filter` operation makes sense:
 ```
 filters:
-
-    OLD Syntax:
-    - key: 'policy.Statement[].Resource'
-        op: contains
-        value: /arn:aws:dynamodb:{region}:{accountId};table/*/g
-    - key: 'policy.Statement[].Action'
-        op: contains
-        value: /arn:aws:dynamodb:{region}:{accountId};table/*/g
-
 
     NEW Syntax:
     - key: 'policy.Statement[]'
