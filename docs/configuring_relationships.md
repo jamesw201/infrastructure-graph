@@ -1,7 +1,7 @@
 # Configuring Relationships
 Relationships can be found in almost every resource in a cloud template. `TerraformParser`(TODO: Give name to application) uses a yaml file to specify where these relationships can be found for each Provider (Ie. `aws_relationships.yaml`).
 
-Most relationships can be specified by simply referencing the source and target attribute within the root object:  
+Most relationships can be specified by simply referencing a source and target attribute within the root object:  
 
 ## Basic relationship configuration
 
@@ -31,6 +31,17 @@ aws_lambda_event_source_mapping:
 ```
 In this case the relationship is [event_source_arn -> function_name].  
 * Where `_arn` is found, the resource name will be extracted from the value.
+
+**Extracted relationship**
+```
+[
+    {
+        source: "arn:aws:kinesis:us-east-1:309983114184:stream/discovery_event-bus",
+        target: "discovery_diff-tagging",
+        label: ""
+    }
+]
+```
 
 ## Complex relationships configuration
 
@@ -87,6 +98,32 @@ aws_iam_role_policy:
     source: role
     target: policy.Statement[].Resource
     label: policy.Statement[].Action
+```
+
+**Extracted relationships**
+```
+[
+    {
+        source: aws_iam_role.discovery_consistency-checker_role,
+        target: "arn:aws:dynamodb:us-east-1:309983114184:table/authorisation_token/*",
+        label: "dynamodb:GetItem,dynamodb:Query"
+    },
+    {
+        source: aws_iam_role.discovery_consistency-checker_role,
+        target: "arn:aws:dynamodb:us-east-1:309983114184:table/authorisation_token",
+        label: "dynamodb:GetItem,dynamodb:Query"
+    },
+    {
+        source: aws_iam_role.discovery_consistency-checker_role,
+        target: "arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key/*",
+        label: "dynamodb:GetItem,dynamodb:Query"
+    },
+    {
+        source: aws_iam_role.discovery_consistency-checker_role,
+        target: "arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key",
+        label: "dynamodb:GetItem,dynamodb:Query"
+    }
+]
 ```
 This config will generate a list of Relationships because of the array syntax: `Statement[]`. Array syntax can only exist in target, array syntax in the source will result in an RelationshipConfigurationError.  
 
