@@ -14,7 +14,10 @@ aws_lambda_event_source_mapping:
     target: function_name
     label: ""
 
+# this config will generate a list of Relationships
+# because of the array syntax, Ie. Statement[].
+# Array syntax can only exist in target.
 aws_iam_role_policy:
-    source: event_source_arn
-    target: function_name
-    label: ""
+    source: role
+    target: policy.Statement[].Resource
+    label: policy.Statement[].Action
