@@ -22,7 +22,7 @@ With data:
   }
 }
 ```
-There isn't a good way to in CloudCustodian to filter multiple attributes in objects in a collection. So making a `filter` operation makes sense:
+CloudCustodian doesn't have a good way to filter multiple attributes in objects in a collection. So making a `filter` operation makes sense:
 ```
 filters:
 
