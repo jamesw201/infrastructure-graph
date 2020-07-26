@@ -61,17 +61,18 @@ cargo build --release
 [√] create json transform from AST  
 [√] get relationship specs from yaml  
 [√] build relationships from templated attribute values  
+[√] build relationships from json values  
+
+[ ] create react diagrams from the output of the AST  
+
 [ ] build mechanism for traversing AST by simple jmespath expressions  
-[ ] build relationships from json values
 
-[ ] create react diagrams from the output of the AST
-
-[ ] create security policies which run against the AST
-
-[ ] create rdf transform from AST
+[ ] create security policies which run against the AST  
 
 [ ] show security violations on the react FE, overlays will highlight the offending resources
-and show a code snippet of the offending template lines
+and show a code snippet of the offending template lines  
+
+[ ] create rdf transform from AST  
 
 [ ] deploy to lambda function  
 [ ] query the AST  
