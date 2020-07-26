@@ -159,8 +159,7 @@ impl RelationshipVisitor {
         };
 
         // loop through targets and add actions where a value is present
-        // let mut withDuplicates: Vec<TargetAndLabel> = targets.into_iter().map(|target| {
-        targets.into_iter().map(|target| {
+        let mut withDuplicates: Vec<TargetAndLabel> = targets.into_iter().map(|target| {
             let vals = match action {
                 Some((key, JsonValue::Array(strings))) => self.downstream_visitor.visit_json_array(strings).replace("\"", "'"),
                 _ => String::from(""),
@@ -170,13 +169,13 @@ impl RelationshipVisitor {
                 _ => String::from(""),
             };
             TargetAndLabel { collection_path: collection_path.to_string(), target: tget, label: vals}
-        }).collect()
-        // }).collect();
+        }).collect();
 
         // TODO:
-        // [ ] loop through targets and remove any duplicates
+        // [√] loop through targets and remove any duplicates
         // [ ] apply rules for merging Relationships?
-        // withDuplicates.dedup()
+        withDuplicates.dedup_by(|a, b| a.target == b.target);
+        withDuplicates
     }
 
     pub fn extract_values(&self, attribute: Option<&Attribute>, collection_path: &str, target: &str, label: &str) -> Vec<TargetAndLabel> {
@@ -287,7 +286,6 @@ impl Visitor<String> for RelationshipVisitor {
                         // [ ] break up the source/target strings into their jmespath expression tokens  
                         // [ ] recursively pass through the tokens to return leaf node value  
                         let dot_split = source.split(".").collect::<Vec<&str>>();
-                        // println!("dot_split length: {}", dot_split.len());
 
                         let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
                         let target_attr = attributes.into_iter().find(|&attr| attr.key == target.to_string());
@@ -297,7 +295,7 @@ impl Visitor<String> for RelationshipVisitor {
 
                         if let Some(source_val) = source_t_string {
                             if let Some(target_val) = target_t_string {
-                                let relationship = Relationship::BasicRelationship { source: source_val, target: target_val, label: String::from("blarp") };
+                                let relationship = Relationship::BasicRelationship { source: source_val, target: target_val, label: String::from("") };
                                 self.downstream_visitor.add_relationship(relationship)
                             }
                         }
@@ -328,10 +326,6 @@ impl Visitor<String> for RelationshipVisitor {
             },
         };
 
-        // [ ] determine if this block represents an IAM Policy or other relevant resource
-        // [ ] somehow determine if attribute values are TemplateStrings
-        // [ ] if found build a relationship between the reference in their value and the name of this block
-        // [ ] somehow add the relationship to a the downstream_visitor's context object
         self.downstream_visitor.visit_tfblock(value)
     }
 
