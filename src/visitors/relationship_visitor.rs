@@ -62,7 +62,7 @@ impl RelationshipVisitor {
             Some(Attribute { key, value: TemplatedString( template_string ) }) => {
                 match template_string {
                     Variable(v_string) => {
-                        Some(v_string.to_string())
+                        Some(v_string.to_string().replace(".id", "").replace(".arn", ""))
                         // Self::handle_resource(&v_string.to_string())
                     },
                     _ => Some(String::from(""))
@@ -70,7 +70,7 @@ impl RelationshipVisitor {
             },
             Some(Attribute { key, value: Str( str_val ) }) => {
                 // Self::handle_resource(&str_val.to_string())
-                Some(str_val.to_string())
+                Some(str_val.to_string().replace(".id", "").replace(".arn", ""))
             },
             // TODO: match on Str() for ARNs which were not templated
             Some(_) => Some(String::from("")),
