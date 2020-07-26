@@ -4,6 +4,11 @@ sns_topic_subscription:
     target: topic_arn
     label: "subscribes"
 
+aws_lambda_function:
+    source: function_name
+    target: role
+    label: ""
+
 aws_lambda_permission:
     source: source_arn
     target: function_name
@@ -14,10 +19,22 @@ aws_lambda_event_source_mapping:
     target: function_name
     label: ""
 
-# this config will generate a list of Relationships
-# because of the array syntax, Ie. Statement[].
-# Array syntax can only exist in target.
 aws_iam_role_policy:
     source: role
-    target: policy.Statement[].Resource
-    label: policy.Statement[].Action
+    targets: 
+        collection_path: policy.Statement
+        target: Resource
+        label: Action
+
+# TODO: 
+# aws_ecs_task_definition
+# aws_vpc
+# aws_nat_gateway
+# aws_route_table
+# aws_route
+# aws_route_table_association
+# aws_vpc_endpoint
+# aws_flow_log
+# aws_elasticache_subnet_group
+# aws_security_group
+# aws_iam_role_policy_attachment

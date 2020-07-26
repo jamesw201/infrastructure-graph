@@ -32,7 +32,7 @@ aws_lambda_event_source_mapping:
 In this case the relationship is [event_source_arn -> function_name].  
 * Where `_arn` is found, the resource name will be extracted from the value.
 
-**Extracted relationship**
+**Extracts relationship**
 ```
 [
     {
@@ -96,11 +96,12 @@ An `aws_iam_role_policy` contains an array of `Statements`, each statement can c
 ```
 aws_iam_role_policy:
     source: role
-    target: policy.Statement[].Resource
-    label: policy.Statement[].Action
+    policy.Statement
+      - target: Resource
+      - label: Action
 ```
 
-**Extracted relationships**
+**Extracts relationships**
 ```
 [
     {
@@ -127,6 +128,14 @@ aws_iam_role_policy:
 ```
 This config will generate a list of Relationships because of the array syntax: `Statement[]`. Array syntax can only exist in target, array syntax in the source will result in an RelationshipConfigurationError.  
 
+TODO: Deduplication will have to take place to reduce wildcard relationship false positives.
+```
+"arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key"
+and
+"arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key/*"
+
+should result in a single relationship.
+```
 
 ## Relationship aggregation rules...
 TODO: decide if aggregation rules belong in the yaml syntax.

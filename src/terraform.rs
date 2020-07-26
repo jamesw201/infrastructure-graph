@@ -336,15 +336,6 @@ pub fn root(i: &str) -> IResult<&str, Vec<TerraformBlock>> {
     )(i)
 }
 
-// TODO: finish this idea!
-// all things that can exist in a templated string ${}
-// fn templated_value(i: &str) -> IResult<&str, TemplateString> {
-//     alt((
-//         map(built_in_function, TemplateString::BuiltInFunction),
-//         map(valid_template_string, TemplateString::Variable),
-//     ))(i)
-// }
-
 fn built_in_function(i: &str) -> IResult<&str, TemplateString> {
     // println!("built_in_function input: {}", i);
 
@@ -428,21 +419,22 @@ mod tests {
 
     #[test]
     fn templated_string_test() {
-        let data = "${someVariable}";
+        let data = r#""${someVariable}""#;
         let expected = TemplateString::Variable(String::from("someVariable"));
         let result = templated_string(data).unwrap();
 
-        assert_eq!(result, ("}", expected))
+        assert_eq!(result, ("", expected))
     }
 
-    #[test]
-    fn built_in_function_test() {
-        // TODO: create stuct for built-in function that can contain an enum which is either 
-        // a built-in function or a string
-        let data = r#""${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}""#;
-        let result = templated_string(data).unwrap();
-        assert_eq!(1, 2)
-    }
+    // #[test]
+    // fn built_in_function_test() {
+    //     // TODO: create stuct for built-in function that can contain an enum which is either 
+    //     // a built-in function or a string
+    //     let data = r#""${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}""#;
+    //     let expected = TemplateString::Variable(String::from("someVariable"));
+    //     let result = templated_string(data).unwrap();
+    //     assert_eq!(1, 2)
+    // }
 
     #[test]
     fn built_in_function_in_resource() {
