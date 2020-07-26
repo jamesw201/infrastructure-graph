@@ -119,6 +119,7 @@ impl RelationshipVisitor {
         if resource.len() > 2 {
             match &resource[..3] {
                 "arn" => Self::convert_arn_to_dot_syntax(resource),
+                // templated_string if &templated_string[..2] == "${" => {
                 templated_string => {
                     let templating_chars_removed = &resource[2..&resource.len()-1];
                     
@@ -126,6 +127,7 @@ impl RelationshipVisitor {
                     
                     Some(attribute_suffix_removed)
                 },
+                // others => Some(others.replace(".id", "").replace(".arn", "")),
             }
         } else {
             // we have hit a '*' wildcard
@@ -285,7 +287,6 @@ impl Visitor<String> for RelationshipVisitor {
                         // TODO: 
                         // [ ] break up the source/target strings into their jmespath expression tokens  
                         // [ ] recursively pass through the tokens to return leaf node value  
-                        let dot_split = source.split(".").collect::<Vec<&str>>();
 
                         let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
                         let target_attr = attributes.into_iter().find(|&attr| attr.key == target.to_string());
@@ -295,8 +296,14 @@ impl Visitor<String> for RelationshipVisitor {
 
                         if let Some(source_val) = source_t_string {
                             if let Some(target_val) = target_t_string {
-                                let relationship = Relationship::BasicRelationship { source: source_val, target: target_val, label: String::from("") };
-                                self.downstream_visitor.add_relationship(relationship)
+                                if target == "function_name" && !target_val.contains(".") {
+                                    let new_target = "aws_lambda_function.".to_owned() + &target_val;
+                                    let relationship = Relationship::BasicRelationship { source: source_val, target: new_target, label: String::from("") };
+                                    self.downstream_visitor.add_relationship(relationship)
+                                } else {
+                                    let relationship = Relationship::BasicRelationship { source: source_val, target: target_val, label: String::from("") };
+                                    self.downstream_visitor.add_relationship(relationship)
+                                }
                             }
                         }
                     },
