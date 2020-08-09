@@ -63,7 +63,7 @@ cargo build --release
 [√] build relationships from templated attribute values  
 [√] build relationships from json values  
 
-[ ] create react diagrams from the output of the AST  
+[√] create react diagrams from the output of the AST  
 
 [ ] build mechanism for traversing AST by simple jmespath expressions  
 

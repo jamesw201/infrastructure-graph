@@ -4,7 +4,16 @@ use std::marker::Copy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::terraform::{
+use crate::structs::attributes::{ Attribute, AttributeType };
+use AttributeType::{
+    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+};
+use crate::structs::template_string::{ TemplateString };
+use crate::structs::json::JsonValue;
+
+use TemplateString::{ Variable, BuiltInFunction };
+
+use crate::structs::terraform_block::{
     TerraformBlock,
     TerraformBlock::{
         NoIdentifiers,
@@ -14,15 +23,8 @@ use crate::terraform::{
     TerraformBlockWithNoIdentifiers,
     TerraformBlockWithOneIdentifier,
     TerraformBlockWithTwoIdentifiers,
-    Attribute,
-    AttributeType,
-    AttributeType::{Str, TemplatedString, Boolean, Num, Array, Block, TFBlock, Json},
-    TemplateString,
-    TemplateString::{Variable, BuiltInFunction},
 };
-use crate::json::{
-    JsonValue,
-};
+
 use crate::visitors::visitor::{ Visitor };
 use crate::visitors::json_visitor::JsonVisitor;
 use crate::relationship_finders::relationship_finder::{RelationshipFinder};
@@ -87,13 +89,13 @@ impl RelationshipVisitor {
             "dynamodb" => Some(format!("aws_dynamodb_table.{}", tokens[5].replace("table/", "").replace("/*", ""))),
             "sns" => Some(format!("aws_sns_topic.{}", tokens[5])),
             "s3" => {
-                let first_slash = tokens[5].find("/");
+                // let first_slash = tokens[5].find("/");
 
-                match first_slash {
-                    // Some(position) => Some(format!("aws_s3_bucket.{}", &tokens[5][0..position])),
-                    Some(position) => Some(format!("aws_s3_bucket.{}", &tokens[5])),
-                    None => Some(format!("aws_s3_bucket.{}", &tokens[5])),
-                }
+                // match first_slash {
+                //     Some(position) => Some(format!("aws_s3_bucket.{}", &tokens[5][0..position])),
+                //     None => Some(format!("aws_s3_bucket.{}", tokens[5])),
+                // }
+                Some(format!("aws_s3_bucket.{}", tokens[5]))
             },
             "lambda" => Some(format!("aws_lambda_function.{}", tokens[6])),
             "sqs" => Some(format!("aws_sqs_queue.{}", tokens[5])),
@@ -195,19 +197,18 @@ impl RelationshipVisitor {
                                 JsonValue::Object( elems ) => {
                                     Self::handle_statements(&self, elems, collection_path)
                                 },
-                                anythingelse => {
+                                _ => {
                                     vec![]
                                 },
                             }
                         }).collect()
                     },
-                    Some(blarp) => {
+                    Some(_) => {
                         vec![]
                     },
                     None => vec![],
                 }
             },
-            // TODO: match on Str() for ARNs which were not templated
             Some(_) => vec![],
             None => vec![]
         }
@@ -294,16 +295,20 @@ impl Visitor<String> for RelationshipVisitor {
                         let source_t_string = Self::extract_value(source_attr);
                         let target_t_string = Self::extract_value(target_attr);
 
+                        fn hack_lambda_attributes(key: &String, val: String) -> String {
+                            if key == "function_name" && !val.contains(".") {
+                                "aws_lambda_function.".to_owned() + &val
+                            } else {
+                                val
+                            }
+                        }
+
                         if let Some(source_val) = source_t_string {
                             if let Some(target_val) = target_t_string {
-                                if target == "function_name" && !target_val.contains(".") {
-                                    let new_target = "aws_lambda_function.".to_owned() + &target_val;
-                                    let relationship = Relationship::BasicRelationship { source: source_val, target: new_target, label: String::from("") };
-                                    self.downstream_visitor.add_relationship(relationship)
-                                } else {
-                                    let relationship = Relationship::BasicRelationship { source: source_val, target: target_val, label: String::from("") };
-                                    self.downstream_visitor.add_relationship(relationship)
-                                }
+                                let new_target = hack_lambda_attributes(target, target_val);
+                                let new_source = hack_lambda_attributes(source, source_val);
+                                let relationship = Relationship::BasicRelationship { source: new_source, target: new_target, label: String::from("") };
+                                self.downstream_visitor.add_relationship(relationship)
                             }
                         }
                     },

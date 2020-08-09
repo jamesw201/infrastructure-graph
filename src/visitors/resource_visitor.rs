@@ -1,18 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::terraform::{
+use crate::structs::terraform_block::{
     TerraformBlock,
-    TerraformBlock::{
-        NoIdentifiers,
-        WithOneIdentifier,
-        WithTwoIdentifiers,
-    },
-    TerraformBlockWithNoIdentifiers,
-    TerraformBlockWithOneIdentifier,
-    TerraformBlockWithTwoIdentifiers,
-    Attribute,
-    AttributeType::{Str, Block}
 };
 
 use crate::visitors::visitor::Visitor;

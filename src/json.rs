@@ -2,8 +2,8 @@ extern crate nom;
 
 use nom::{
   branch::alt,
-  bytes::complete::{escaped, escaped_transform, tag, is_not, take_till, take_while},
-  character::complete::{alphanumeric1, alpha1, char, multispace0, one_of, space0},
+  bytes::complete::{ escaped, tag, is_not, take_till, take_while },
+  character::complete::{ char, multispace0, one_of, space0 },
   combinator::{cut, map, opt, value},
   multi::separated_list0,
   number::complete::double,
@@ -12,15 +12,7 @@ use nom::{
 };
 use std::str;
 
-#[derive(PartialEq, Debug, Clone)]
-pub enum JsonValue {
-  Str(String),
-  Boolean(bool),
-  Null(String),
-  Num(f64),
-  Array(Vec<JsonValue>),
-  Object(Vec<(String, JsonValue)>),
-}
+use crate::structs::json::JsonValue;
 
 fn parse_single_line_str(i: &str) -> IResult<&str, String> {
     let (rest, result) = preceded(space0, escaped(is_not("\""), '\\', one_of(r#"\"#)))(i)?;

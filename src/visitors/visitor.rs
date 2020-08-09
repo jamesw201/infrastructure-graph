@@ -1,13 +1,11 @@
-use crate::terraform::{
+use crate::structs::terraform_block::{
     TerraformBlock,
-    Attribute,
-    AttributeType,
-    TemplateString,
 };
 
-use crate::json::{
-    JsonValue
-};
+use crate::structs::attributes::{ Attribute, AttributeType };
+use crate::structs::template_string::{ TemplateString };
+use crate::structs::json::JsonValue;
+
 
 pub trait Visitor<T> {
     fn visit_str(&self, value: &String) -> T;

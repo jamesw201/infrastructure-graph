@@ -5,7 +5,16 @@
 // https://www.lihaoyi.com/post/ZeroOverheadTreeProcessingwiththeVisitorPattern.html
 use std::cell::RefCell;
 
-use crate::terraform::{
+use crate::structs::attributes::{ Attribute, AttributeType };
+use AttributeType::{
+    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+};
+use crate::structs::template_string::{ TemplateString };
+use crate::structs::json::JsonValue;
+
+use TemplateString::{ Variable, BuiltInFunction };
+
+use crate::structs::terraform_block::{
     TerraformBlock,
     TerraformBlock::{
         NoIdentifiers,
@@ -15,15 +24,6 @@ use crate::terraform::{
     TerraformBlockWithNoIdentifiers,
     TerraformBlockWithOneIdentifier,
     TerraformBlockWithTwoIdentifiers,
-    Attribute,
-    AttributeType,
-    AttributeType::{Str, TemplatedString, Boolean, Num, Array, Block, TFBlock, Json},
-    TemplateString,
-    TemplateString::{Variable, BuiltInFunction},
-};
-
-use crate::json::{
-    JsonValue
 };
 
 use crate::relationship_finders::relationship_finder::{RelationshipFinder};

@@ -12,68 +12,22 @@ use nom::{
   IResult
 };
 
-use crate::json::{JsonValue, parse_json};
+use crate::structs::terraform_block::{
+    TerraformBlock,
+    TerraformBlockWithNoIdentifiers,
+    TerraformBlockWithOneIdentifier,
+    TerraformBlockWithTwoIdentifiers,
+};
+
+use crate::structs::attributes::{ Attribute, AttributeType };
+use AttributeType::{
+    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+};
+use crate::structs::template_string::{ TemplateString, BuiltInFunction };
+use crate::structs::json::JsonValue;
+use crate::json::{parse_json};
 
 use std::str;
-
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct BuiltInFunction {
-    pub name: String,
-    pub param: TemplateString,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum TemplateString {
-    Variable(String),
-    BuiltInFunction(Box<BuiltInFunction>),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum AttributeType {
-    Str(String),
-    TemplatedString(TemplateString),
-    Boolean(bool),
-    Num(f64),
-    Array(Vec<AttributeType>),
-    Block(Vec<Attribute>),
-    TFBlock(TerraformBlock),
-    Json(JsonValue),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct Attribute {
-    pub key: String,
-    pub value: AttributeType
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum TerraformBlock {
-    NoIdentifiers(TerraformBlockWithNoIdentifiers),
-    WithOneIdentifier(TerraformBlockWithOneIdentifier),
-    WithTwoIdentifiers(TerraformBlockWithTwoIdentifiers)
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct TerraformBlockWithNoIdentifiers {
-    pub block_type: String,
-    pub attributes: Vec<Attribute>
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct TerraformBlockWithOneIdentifier {
-    pub block_type: String,
-    pub first_identifier: String,
-    pub attributes: Vec<Attribute>
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct TerraformBlockWithTwoIdentifiers {
-    pub block_type: String,
-    pub first_identifier: String,
-    pub second_identifier: String,
-    pub attributes: Vec<Attribute>
-}
 
 
 // #[allow(dead_code)]

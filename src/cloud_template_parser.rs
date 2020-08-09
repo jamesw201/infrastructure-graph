@@ -5,8 +5,12 @@ use nom::{
 // use crate::terraform::root;
 use crate::terraform::{
   root,
-  TerraformBlock,
 };
+
+use crate::structs::terraform_block::{
+    TerraformBlock,
+};
+
 use std::fs;
 
 /// CloudTemplateParser -> (ResourceTree)
