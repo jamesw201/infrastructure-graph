@@ -1,5 +1,18 @@
 #[cfg_attr(test, macro_use)] extern crate serde_json;
+use structopt::StructOpt;
+use std::collections::HashMap;
+extern crate serde_yaml;
+use serde::{Deserialize};
+
+use std::time::{Instant};
+use exitfailure::ExitFailure;
+
 use rust_nom_json::*;
+use rust_nom_json::visitors::resource_visitor;
+
+use rust_nom_json::visitors::relationship_visitor::{Relationship};
+
+mod terraform;
 
 // DONE:
 // [√] read this approach for mocking reqwest with traits: https://write.as/balrogboogie/testing-reqwest-based-clients
@@ -8,21 +21,48 @@ use rust_nom_json::*;
 // [√] use that trait to mock responses, enabling TDD for applications with side effects  
 // [√] make sure that errors are transformed into some kind of standard Error
 
-fn main() {
-    let client = http_client::HttpClient;
-    let service = ip_service::IPService::new(client);
-
-    // settled with unwrap after failing to use ? or await: https://github.com/seanmonstar/reqwest/issues/275
-    let bla = service.call_api().unwrap();
-    println!("api: {:#?}", bla);
-
-    let f = foo::Foo::new("hello");
-    println!("{:?}", f);
+/// Search for a pattern in a file and display the lines that contain it.
+#[derive(StructOpt)]
+struct Cli {
+    /// The path to the file to read
+    #[structopt(parse(from_os_str))]
+    path: std::path::PathBuf,
 }
 
-// TODO: 
-// [ ] read Terraform files in
-// [ ] begin nom parsing on files
+fn main() -> Result<(), ExitFailure> {
+    let start = Instant::now();
+    let args = Cli::from_args();
+    
+    // let client = http_client::HttpClient;
+    // let service = ip_service::IPService::new(client);
+
+    // // settled with unwrap after failing to use ? or await: https://github.com/seanmonstar/reqwest/issues/275
+    // let bla = service.call_api().unwrap();
+    // println!("api: {:#?}", bla);
+
+    // let f = foo::Foo::new("hello");
+    // println!("{:?}", f);
+
+    let f = std::fs::File::open("./example_files/aws_relationships.yaml")?;
+    let aws_relationship_specs: HashMap<String, Relationship> = serde_yaml::from_reader(f)?;
+    println!("Read YAML string: {:?}", aws_relationship_specs);
+
+    let parser = cloud_template_parser::CloudTemplateParser::new();
+    let result = parser.handle(args.path);
+
+    let json = resource_visitor::dispatch(&result, aws_relationship_specs);
+    // // iterate over array, use match statement to get initial visitor right
+    // // then allow Visitor pattern to do the rest
+    let elapsed_before_printing = start.elapsed();
+
+    println!("json: {:?}", json);
+    // println!("ast: {:?}", result);
+
+    let duration = start.elapsed();
+    println!("Terraform parsed in: {:?}", elapsed_before_printing);
+    println!("Terraform printed to stdout in: {:?}", duration);
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -31,6 +71,8 @@ mod tests {
     use async_trait::async_trait;
     use anyhow::Result;
     use serde_json::Value;
+    // use std::io::BufReader;
+    // use std::fs::File;
 
     struct MockHttpClient;
     #[async_trait]
@@ -56,4 +98,54 @@ mod tests {
             "baz": "quux"
         }));
     }
+
+    // TODO: test that library can read from an array of  BufferedReader
+    // depending on the filename { bla.tfvars, bla.variables, bla.tf } we will look to either parse or create values for string interpolation.
+    // #[test]
+    // fn buffer_reader_test() {
+    //     struct FileType<T> {
+    //         filename: String,
+    //         reader: BufReader<T>,
+    //     };
+    //     impl <T> FileType<T> {
+    //         pub fn new(filename: String, reader: BufReader<T>) -> FileType<T> {
+    //             FileType { filename, reader }
+    //         }
+    //     }
+
+    //     // 
+    //     let tf_file = File::open("fake.tf").unwrap();
+    //     let tfvars_file = File::open("fake.tfvars").unwrap();
+    //     let variables_file = File::open("variables.tf").unwrap();
+
+    //     let tf = FileType::new(String::from("fake.tf"), BufReader::new(tf_file));
+    //     let tfvars = FileType::new(String::from("fake.tfvars"), BufReader::new(tfvars_file));
+    //     let variables = FileType::new(String::from("variables.tf"), BufReader::new(variables_file));
+
+    //     let files = vec![tf, tfvars, variables];
+    //     let parser = cloud_template_parser::CloudTemplateParser::new();
+    //     let result = parser.handle(vec![String::from("discovery.tf")]);
+    //     assert_eq!(true, true)
+
+    //     // assert_eq!(result, json!({
+    //     //     "resources": [
+    //     //         {
+    //     //             "resource": "bla",
+    //     //             "foo": "bar",
+    //     //             "baz": "quux",
+    //     //         },
+    //     //         {
+    //     //             "resource": "bloop",
+    //     //             "foo": "bar",
+    //     //             "baz": "quux",
+    //     //         }
+    //     //     ],
+    //     //     "relationships": [
+    //     //         {
+    //     //             "source": "bla",
+    //     //             "target": "bloop",
+    //     //         }
+    //     //     ]
+    //     // }));
+    // }
 }
