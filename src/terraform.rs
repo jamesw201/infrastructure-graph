@@ -390,21 +390,21 @@ mod tests {
     //     assert_eq!(1, 2)
     // }
 
-    #[test]
-    fn built_in_function_in_resource() {
-        // TODO: create stuct for built-in function that can contain an enum which is either 
-        // a built-in function or a string
-        let data = r#"
-resource "aws_s3_bucket_object" "discovery_cpsc-vmware-config" {
-    bucket               = "acp-platform-s-discovery-sandbox1"
-    source               = "/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"
-    etag                 = "${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}"
-    key                  = "default-config/cpsc-vmware-config.json"
-}
-"#;
-        let result = root(data).unwrap();
-        assert_eq!(1, 2)
-    }
+//     #[test]
+//     fn built_in_function_in_resource() {
+//         // TODO: create stuct for built-in function that can contain an enum which is either 
+//         // a built-in function or a string
+//         let data = r#"
+// resource "aws_s3_bucket_object" "discovery_cpsc-vmware-config" {
+//     bucket               = "acp-platform-s-discovery-sandbox1"
+//     source               = "/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"
+//     etag                 = "${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}"
+//     key                  = "default-config/cpsc-vmware-config.json"
+// }
+// "#;
+//         let result = root(data).unwrap();
+//         assert_eq!(1, 2)
+//     }
 
     #[test]
     fn inline_block_with_one_pair() {
