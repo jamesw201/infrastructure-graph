@@ -198,4 +198,16 @@ mod tests {
         );
         assert_eq!(result, expected)
     }
+
+    #[test]
+    fn query_tf_block_for_single_root_attribute() {
+        let resource = example_resource();
+
+        let result = tf_block_query::jmespath_query(&resource, "depends_on");
+
+        let expected = tf_block_query::TFQueryResult::Scalar(
+            Array(vec![AttributeType::Str(String::from("aws_iam_role.discovery_scheduler_role"))])
+        );
+        assert_eq!(result, expected)
+    }
 }

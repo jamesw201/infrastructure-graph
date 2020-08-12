@@ -364,8 +364,8 @@ fn templated_string(i: &str) -> IResult<&str, TemplateString> {
 // [√] parse templated strings
 // [x] handle these: etag              = "${md5(file("default-config/cpsc-vmware-config.json"))}"
 // [√] parse whole files from cli
-// [ ] build relationships from templated attribute values
-// [ ] build relationships json values
+// [√] build relationships from templated attribute values
+// [√] build relationships json values
 
 #[cfg(test)]
 mod tests {

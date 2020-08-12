@@ -23,12 +23,10 @@ impl JsonValue {
             Self::Num(value) => AttributeType::Num(value.clone()),
             Self::Array(value) => AttributeType::Array(
                 value.into_iter().map(|val| Self::convert_to_attribute_type(val)).collect()
-                // value.into_iter().map(|val| val.convert_to_attribute_type()).collect()
             ),
             Self::Object(value) => AttributeType::Block(
                 value.into_iter().map(|(key, val)| 
                     Attribute{ key: key.to_string(), value: Self::convert_to_attribute_type(val) } 
-                    // Attribute{ key: key.to_string(), value: val.convert_to_attribute_type() } 
                 ).collect()
             ),
         }
@@ -42,9 +40,9 @@ impl Queryable for JsonValue {
         if expression.path_parts.len() == 1 {
             // println!("JsonValue {:?}", self);
 
-            let queried_self_results = match self {
-                JsonValue::Object(val) => {
-                    let found = val.iter().find(|(key, _)| {
+            let queried_json_results = match self {
+                JsonValue::Object(obj_vals) => {
+                    let found = obj_vals.iter().find(|(key, _)| {
                         match &expression.path_parts[0] {
                             Scalar(path) => key == &path.to_string(),
                             List(path) => key == &path.to_string(),
@@ -56,12 +54,12 @@ impl Queryable for JsonValue {
                         vec![]
                     }
                 },
-                JsonValue::Array(vals) => {
+                JsonValue::Array(array_vals) => {
                     // if the first element is a JsonValue::Object then the rest will be too
-                    vals.into_iter().map(|obj| {
+                    array_vals.into_iter().map(|obj| {
                         match obj {
-                            JsonValue::Object(val) => {
-                                val.iter().find(|(key, _)| {
+                            JsonValue::Object(obj_vals) => {
+                                obj_vals.iter().find(|(key, _)| {
                                     match &expression.path_parts[0] {
                                         Scalar(path) => key == &path.to_string(),
                                         List(path) => key == &path.to_string(),
@@ -75,9 +73,7 @@ impl Queryable for JsonValue {
                 _ => vec![]
             };
             
-            // println!("bla: {:?}", bla);
-
-            let attributes = queried_self_results.into_iter().map(|(key, json_val)| {
+            let attributes = queried_json_results.into_iter().map(|(key, json_val)| {
                 let clone = json_val.clone();
                 Attribute { key: key.to_string(), value: Self::convert_to_attribute_type(clone) }
             }).collect();
@@ -100,12 +96,9 @@ impl Queryable for JsonValue {
                             }).flatten().collect();
 
                         let result = AttributeType::Array(res);
-                        // println!("Translated Attributes: {:?}", &result);
                         Some(result)
                     } else {
-                        // return None because only an Object is applicable for a List path_part
-                        None
-                        // vec![]
+                        None    // return None because only an Object is applicable for a List path_part
                     }
                 },
                 Scalar(_) => None,
