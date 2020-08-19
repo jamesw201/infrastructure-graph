@@ -367,24 +367,6 @@ impl Visitor<String> for RelationshipVisitor {
 mod tests {
     use super::*;
 
-    struct MockJsonVisitor {
-        pub relationships: Vec<String>,
-    }
-
-    impl Visitor<String> for MockJsonVisitor {
-        fn visit_str(&self, value: &String) -> String { String::from("") }
-        fn visit_template_string(&self, value: &TemplateString) -> String { String::from("") }
-        fn visit_boolean(&self, value: &bool) -> String { String::from("") }
-        fn visit_num(&self, value: &f64) -> String { String::from("") }
-        fn visit_block(&self, value: &Vec<Attribute>) -> String { String::from("") }
-        fn visit_array(&self, value: &Vec<AttributeType>) -> String { String::from("") }
-        fn visit_tfblock(&self, value: &TerraformBlock) -> String { String::from("") }
-        fn visit_attribute(&self, value: &Attribute) -> String { String::from("") }
-        fn visit_json(&self, value: &JsonValue) -> String { String::from("") }
-        fn visit_json_array(&self, value: &Vec<JsonValue>) -> String { String::from("") }
-        fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> String { String::from("") }
-    }
-
     #[test]
     fn relationship_visitor_test() {
         let resource1 = WithOneIdentifier(

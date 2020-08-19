@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use crate::structs::terraform_block::TerraformBlock;
 use crate::structs::template_string::{ TemplateString };
 use crate::structs::json::JsonValue;
@@ -7,7 +8,7 @@ use crate::relationship_finders::tf_block_query::tf_block_query::{JmespathExpres
 use PathPart::{ List, Scalar};
 
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub enum AttributeType {
     Str(String),
     TemplatedString(TemplateString),
@@ -19,7 +20,7 @@ pub enum AttributeType {
     Json(JsonValue),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Attribute {
     pub key: String,
     pub value: AttributeType
@@ -27,23 +28,17 @@ pub struct Attribute {
 
 impl Queryable for Attribute {
     fn query(&self, expression: JmespathExpression) -> Option<AttributeType> {
+        println!("unhandled Attribute");
         None
     }
 }
 
 impl Queryable for AttributeType {
     fn query(&self, expression: JmespathExpression) -> Option<AttributeType> {
-        if expression.path_parts.len() == 1 {
-            Some(self.clone())
-        } else {
-            // println!("AttributeType expression {:?}", expression);
-            // println!("AttributeType attribute {:?}", &self);
-
-            match self {
-                Self::TFBlock(value) => value.query(expression),
-                Self::Json(value) => value.query(expression),
-                _ => None   // any other value would not make sense if the JmespathExpression hasn't reached its leaf node here
-            }
+        match self {
+            Self::TFBlock(value) => value.query(expression),
+            Self::Json(value) => value.query(expression),
+            _ => None   // any other value would not make sense if the JmespathExpression hasn't reached its leaf node here
         }
     }
 }

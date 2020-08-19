@@ -72,6 +72,9 @@ cargo build --release
 [ ] show security violations on the react FE, overlays will highlight the offending resources
 and show a code snippet of the offending template lines  
 
+[ ] convert the abstract structure into a graph structure. This will be better for Policy checking   
+[ ] refactor the policy visitor to work against a graph structure  
+
 [ ] create rdf transform from AST  
 
 [ ] deploy to lambda function  

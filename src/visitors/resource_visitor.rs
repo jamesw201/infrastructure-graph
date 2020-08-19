@@ -3,10 +3,12 @@ use std::collections::HashMap;
 
 use crate::structs::terraform_block::{
     TerraformBlock,
+    TerraformBlockWithTwoIdentifiers,
 };
 
 use crate::visitors::visitor::Visitor;
 use crate::visitors::json_visitor::JsonVisitor;
+use crate::structs::policies::Policies;
 use crate::visitors::relationship_visitor::{RelationshipVisitor, Relationship};
 use crate::relationship_finders::relationship_finder::RelationshipFinder;
 
@@ -14,7 +16,7 @@ use crate::relationship_finders::relationship_finder::RelationshipFinder;
 //     println!("{}", std::any::type_name::<T>())
 // }
 
-pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap<String, Relationship>) -> String {
+pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap<String, Relationship>, policy_specs: Policies) -> String {
     let mut vec = Vec::new();
 
     let json_visitor = JsonVisitor{relationships: RefCell::new(vec)};
@@ -24,6 +26,24 @@ pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap
     let json_resources: Vec<String> = resources.into_iter().map(|resource| visitor.visit_tfblock(resource)).collect();
     let json_resources_joined = json_resources.join(",");
     let relationships = visitor.output_relationships();
+
+    // let resource_map: HashMap<&str, &TerraformBlock> = resources.into_iter().map(|resource| {
+    //     match resource {
+    //         TerraformBlock::NoIdentifiers(tf_block) => {
+    //             ("no-identifier", resource)
+    //         }
+    //         TerraformBlock::WithOneIdentifier(tf_block) => {
+    //             (tf_block.first_identifier.as_str(), resource)
+    //         }
+    //         TerraformBlock::WithTwoIdentifiers(tf_block) => {
+    //             (tf_block.first_identifier.as_str(), resource)
+    //         }
+    //     }
+    // }).collect();
+
+    println!("resources length: {}", resources.len());
+    // println!("hashmap length: {}", resource_map.len());
+    // TODO run PolicyChecker and add policy results here
 
     format!("{{\"resources\":[{}],\"relationships\":{}}}", json_resources_joined, relationships)
 }

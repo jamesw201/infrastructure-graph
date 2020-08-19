@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use crate::structs::traits::query::Queryable;
 
 use crate::structs::attributes::{ Attribute, AttributeType };
 use crate::relationship_finders::tf_block_query::tf_block_query::{JmespathExpression, PathPart};
 use PathPart::{ List, Scalar};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub enum JsonValue {
   Str(String),
   Boolean(bool),
@@ -101,7 +102,10 @@ impl Queryable for JsonValue {
                         None    // return None because only an Object is applicable for a List path_part
                     }
                 },
-                Scalar(_) => None,
+                Scalar(_) => {
+                    println!("we're looking at an unhandled Scalar");
+                    None
+                },
             }
         }
     }

@@ -1,0 +1,18 @@
+# policies to be run against cloud resources
+policies:
+ - name: example-do-policy-name-check
+   description: Toy policy that checks the names of aws_iam_role_policy resources
+   resource: aws_iam_role_policy
+   filters:
+     - key: name
+       op: eq
+       value: discovery_scheduler_role_policy
+
+ - name: example-do-policy-name-check
+   description: Toy policy that checks the names of aws_iam_role_policy resources
+   resource: aws_iam_role_policy
+   filters:
+     - key: name
+       op: eq
+       value: discovery_scheduler_role_policy
+ 
