@@ -45,8 +45,6 @@ fn extract_policy_targets(policies: &Policies) -> Vec<String> {
 }
 
 fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResult {
-    println!("attribute type: {:?}", attribute_type);
-
     let result = match attribute_type {
         Block(attributes) => {
             match &attributes[0].value {
