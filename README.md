@@ -65,14 +65,15 @@ cargo build --release
 
 [√] create react diagrams from the output of the AST  
 
-[ ] build mechanism for traversing AST by simple jmespath expressions  
+[√] build mechanism for traversing AST by simple jmespath expressions  
 
-[ ] create security policies which run against the AST  
+[√] create security policies which run against the AST  
 
 [ ] show security violations on the react FE, overlays will highlight the offending resources
 and show a code snippet of the offending template lines  
 
-[ ] convert the abstract structure into a graph structure. This will be better for Policy checking   
+[ ] investigate converting the abstract structure into a graph structure. This will be better for Policy checking   
+
 [ ] refactor the policy visitor to work against a graph structure  
 
 [ ] create rdf transform from AST  
