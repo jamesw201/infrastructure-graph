@@ -7,12 +7,11 @@ use crate::structs::policies::{ Policies, Policy, Filter };
 use crate::relationship_finders::tf_block_query::tf_block_query::{ jmespath_query, TFQueryResult };
 
 use TFQueryResult::{ List, Scalar };
-// use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use itertools::Itertools;
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FilterResult {
     filter: Filter, // TODO: this should be a Vector of Filters
     result: bool,
@@ -24,16 +23,16 @@ impl FilterResult {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PolicyResult {
-    filter_results: Vec<FilterResult>, // TODO: this should be a Vector of Filters
-    resource_id: String,
-    result: bool,
+    filters: Vec<FilterResult>,
+    policy_id: String,
+    policy_result: bool,
 }
 
 impl PolicyResult {
-    pub fn new(filter_results: Vec<FilterResult>, resource_id: String, result: bool) -> PolicyResult {
-        PolicyResult { filter_results, resource_id, result }
+    pub fn new(filters: Vec<FilterResult>, policy_id: String, policy_result: bool) -> PolicyResult {
+        PolicyResult { filters, policy_id, policy_result }
     }
 }
 
@@ -46,6 +45,8 @@ fn extract_policy_targets(policies: &Policies) -> Vec<String> {
 }
 
 fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResult {
+    println!("attribute type: {:?}", attribute_type);
+
     let result = match attribute_type {
         Block(attributes) => {
             match &attributes[0].value {
@@ -55,6 +56,8 @@ fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResu
                 _ => false,
             }
         },
+        Str(val) => val == filter.value,
+        Num(val) => val == filter.value.parse::<f64>().unwrap(),
         // TODO: accommodate all variants
         _ => false,
     };
@@ -63,7 +66,7 @@ fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResu
 }
 
 fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
-    let filter_results: Vec<FilterResult> = policy.filters.iter().map(|filter| {
+    let filters: Vec<FilterResult> = policy.filters.iter().map(|filter| {
         let query_result = match resource {
             TerraformBlock::WithTwoIdentifiers(tf_block) => jmespath_query(tf_block, &filter.key.as_str()),
             _ => TFQueryResult::None,
@@ -75,33 +78,49 @@ fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
             TFQueryResult::None => FilterResult::new(filter.clone(), false),
         }
     }).collect();
-    println!("filter_results: {:?}", filter_results);
+    println!("filters: {:?}", filters);
 
-    let combined_result = filter_results.iter().fold(true, |acc, x| acc && x.result);
+    let combined_result = filters.iter().fold(true, |acc, x| acc && x.result);
 
-    PolicyResult::new(filter_results, resource.get_id(), combined_result)
+    PolicyResult::new(filters, policy.name.to_string(), combined_result)
 }
 
 // TODO: Return a HashMap<Policy, Vec<PolicyResult>>
 // fn query_resources(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Policies) -> HashMap<Policy, Vec<PolicyResult>> {
-fn query_resources(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Policies) -> Vec<Vec<PolicyResult>> {
-    let mut results_map: HashMap<&Policy, Vec<PolicyResult>> = HashMap::new();
+fn query_resources<'a>(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Policies) -> HashMap<String, Vec<PolicyResult>> {
+    let mut results_map: HashMap<String, Vec<PolicyResult>> = HashMap::new();
 
-    policies.policies.iter().map(|policy| {
+    for policy in policies.policies {
         let cache_entry = cache.get(policy.resource.as_str());
 
         if let Some(resources) = cache_entry {
-            Some(
-                resources.iter().map(|resource| evaluate_policy(policy, resource)).collect()
-                // results_map.insert(policy, resource_query_result);
-            )
-        } else {
-            None
+            for &resource in resources {
+                let policy_results = evaluate_policy(&policy, &resource);
+
+                if policy_results.policy_result == false {
+                    let existing_policy_results = results_map.get(&resource.get_id());
+
+                    match existing_policy_results {
+                        Some(results) => {
+                            let mut bla = results.clone();
+                            bla.push(policy_results);
+                            println!("old vec: {:?}", existing_policy_results);
+                            println!("new vec: {:?}", bla);
+                            results_map.insert(resource.get_id(), bla.to_vec());
+                        },
+                        None => {
+                            results_map.insert(resource.get_id(), vec![policy_results]);
+                        },
+                    }
+                }
+            }
         }
-    }).flatten().collect()
+    };
+
+    results_map
 }
 
-pub fn evaluate(policies: Policies, resources: Vec<TerraformBlock>) -> Vec<PolicyResult> {
+pub fn evaluate(policies: Policies, resources: &Vec<TerraformBlock>) -> HashMap<String, Vec<PolicyResult>> {
     let mut cache: HashMap<&str, Vec<&TerraformBlock>> = HashMap::new();
 
     let resource_targets = extract_policy_targets(&policies);
@@ -123,14 +142,9 @@ pub fn evaluate(policies: Policies, resources: Vec<TerraformBlock>) -> Vec<Polic
 
     let policy_results = query_resources(cache, policies);
     
-    println!("policy_results: {:?}", policy_results);
-    // TODO: 
-    // [√] loop through Policies
-    // [√] find the corresponding resources
-    // [√] build a map of evaluation results
-    // [ ] flatten the map and return
+    println!("policies: {:?}", policy_results);
 
-    vec![]
+    policy_results
 }
 
 #[cfg(test)]
@@ -155,11 +169,7 @@ mod tests {
                     description: String::from("balbabal"),
                     resource: String::from("aws_iam_role_policy"),
                     filters: vec![
-                        Filter {
-                            key: String::from("policy.maxReceiveCount"),
-                            op: String::from("eq"),
-                            value: String::from("2.0"),
-                        },
+                        Filter::new("policy.maxReceiveCount", "eq", "2.0"),
                     ],
                 },
                 Policy {
@@ -167,11 +177,7 @@ mod tests {
                     description: String::from("balbabal"),
                     resource: String::from("aws_ec2_instance"),
                     filters: vec![
-                        Filter {
-                            key: String::from("id"),
-                            op: String::from("eq"),
-                            value: String::from("id-that-we-are-looking-for"),
-                        },
+                        Filter::new("id", "eq", "id-that-we-are-looking-for2"),
                     ],
                 },
                 Policy {
@@ -179,11 +185,7 @@ mod tests {
                     description: String::from("balbabal"),
                     resource: String::from("aws_iam_role_policy"),
                     filters: vec![
-                        Filter {
-                            key: String::from("visibility_timeout_seconds"),
-                            op: String::from("eq"),
-                            value: String::from("30.0"),
-                        },
+                        Filter::new("visibility_timeout_seconds", "eq", "3.1"),
                     ],
                 },
             ]
@@ -216,7 +218,12 @@ mod tests {
                     block_type: String::from("resource"),
                     first_identifier: String::from("aws_iam_role_policy"),
                     second_identifier: String::from("second-iam-policy"),
-                    attributes: vec![]
+                    attributes: vec![
+                        Attribute {
+                            key: String::from("visibility_timeout_seconds"), 
+                            value: AttributeType::Num(30.0)
+                        },
+                    ]
                 }
             ),
             TerraformBlock::WithTwoIdentifiers(
@@ -224,7 +231,12 @@ mod tests {
                     block_type: String::from("resource"),
                     first_identifier: String::from("aws_ec2_instance"),
                     second_identifier: String::from("my_ec2_instance"),
-                    attributes: vec![]
+                    attributes: vec![
+                        Attribute {
+                            key: String::from("id"),
+                            value: AttributeType::Str(String::from("id-that-we-are-looking-for"))
+                        }
+                    ]
                 }
             ),
         ]
@@ -263,9 +275,9 @@ mod tests {
             result: true,
         };
         let expected = PolicyResult{
-            filter_results: vec![filter_result],
-            resource_id: resources[0].get_id(),
-            result: true,
+            filters: vec![filter_result],
+            policy_id: policies.policies[0].name.to_string(),
+            policy_result: true,
         };
 
         assert_eq!(result, expected)
@@ -280,11 +292,32 @@ mod tests {
     }
 
     #[test]
-    fn unique_resources_test() {
+    fn evaluate_test() {
         let resources = setup_resources();
         let policies = setup_policies();
+        let policies_clone = policies.clone();
 
-        let result = evaluate(policies, resources);
-        assert_eq!(1, 2)
+        let result = evaluate(policies, &resources);
+        let mut expected_map: HashMap<String, Vec<PolicyResult>> = HashMap::new();
+        
+        let f1 = Filter::new("id", "eq", "id-that-we-are-looking-for2");
+        let f2 = Filter::new("visibility_timeout_seconds", "eq", "3.1");
+        let f3 = Filter::new("policy.maxReceiveCount", "eq", "2.0");
+        let filter_result1 = FilterResult::new(f1, false);
+        let filter_result2= FilterResult::new(f2, false);
+        let filter_result3 = FilterResult::new(f3, false);
+
+        let policyResult1 = PolicyResult::new(vec![filter_result1.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policyResult2 = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policyResult2_clone = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policyResult3 = PolicyResult::new(vec![filter_result3.clone()], policies_clone.policies[0].name.to_string(), false);
+        
+        expected_map.insert(resources[2].get_id(), vec![policyResult1]);
+        expected_map.insert(resources[0].get_id(), vec![policyResult2]);
+        expected_map.insert(resources[1].get_id(), vec![policyResult2_clone, policyResult3]);
+
+        assert_eq!(result.contains_key(&resources[0].get_id()), true);
+        assert_eq!(result.contains_key(&resources[1].get_id()), true);
+        assert_eq!(result.contains_key(&resources[2].get_id()), true);
     }
 }

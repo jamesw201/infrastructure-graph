@@ -5,7 +5,7 @@ use crate::structs::attributes::{ Attribute, AttributeType };
 use crate::relationship_finders::tf_block_query::tf_block_query::{JmespathExpression, PathPart};
 use PathPart::{ List, Scalar};
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone, PartialOrd)]
 pub enum JsonValue {
   Str(String),
   Boolean(bool),
@@ -16,7 +16,7 @@ pub enum JsonValue {
 }
 
 impl JsonValue {
-    fn convert_to_attribute_type(json_value: JsonValue) -> AttributeType {
+    fn convert_to_attribute_type(json_value: JsonValue) ->  AttributeType {
         match json_value {
             Self::Str(value) => AttributeType::Str(value.to_string()),
             Self::Boolean(value) => AttributeType::Boolean(value.clone()),

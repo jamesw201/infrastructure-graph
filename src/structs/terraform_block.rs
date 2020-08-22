@@ -38,8 +38,8 @@ impl TerraformBlock {
     pub fn get_id(&self) -> String {
         match self {
             Self::NoIdentifiers(resource) => resource.block_type.to_string(),
-            Self::WithOneIdentifier(resource) => resource.block_type.to_string() + &resource.first_identifier,
-            Self::WithTwoIdentifiers(resource) => resource.block_type.to_string() + &resource.first_identifier,
+            Self::WithOneIdentifier(resource) => resource.block_type.to_string() + "_" + &resource.first_identifier,
+            Self::WithTwoIdentifiers(resource) => resource.first_identifier.to_string() + "_" + &resource.second_identifier,
         }
     }
 }
