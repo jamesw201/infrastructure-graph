@@ -60,7 +60,7 @@ fn main() -> Result<(), ExitFailure> {
     // // then allow Visitor pattern to do the rest
     let elapsed_before_printing = start.elapsed();
 
-    // println!("json: {:?}", json);
+    println!("json: {:?}", json);
     // println!("ast: {:?}", parsed_resources);
 
     let duration = start.elapsed();

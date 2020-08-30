@@ -69,7 +69,6 @@ impl Queryable for TerraformBlockWithTwoIdentifiers {
                 if expression.path_parts.len() == 1 {
                     Some(thing.value.clone())
                 } else {
-                    println!("path_parts.len() == {}", expression.path_parts.len());
                     let new_expression = JmespathExpression { path_parts: expression.path_parts[1..].to_vec() };
                     thing.value.query(new_expression)
                 }

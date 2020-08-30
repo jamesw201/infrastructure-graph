@@ -1,3 +1,5 @@
+use std::fmt;
+use serde::{Deserialize, Serialize};
 use crate::structs::terraform_block::{
     TerraformBlock,
 };
@@ -11,7 +13,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct FilterResult {
     filter: Filter, // TODO: this should be a Vector of Filters
     result: bool,
@@ -23,7 +25,13 @@ impl FilterResult {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+impl fmt::Display for FilterResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{\"filter\":\"{}\",\"result\":\"{}\"}}", self.filter, self.result)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PolicyResult {
     filters: Vec<FilterResult>,
     policy_id: String,
@@ -36,6 +44,14 @@ impl PolicyResult {
     }
 }
 
+impl fmt::Display for PolicyResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let filters_str: Vec<String> = self.filters.iter().map(|filter| format!("{}", filter)).collect();
+        let filters_joined: String = filters_str.join(",");
+        write!(f, "{{\"filters\":\"{}\",\"policy_id\":\"{}\",\"policy_result\":\"{}\"}}", filters_joined, self.policy_id, self.policy_result)
+    }
+}
+
 fn extract_policy_targets(policies: &Policies) -> Vec<String> {
     let result: Vec<String> = policies.policies.iter().map(|policy| {
         policy.resource.clone()
@@ -45,17 +61,22 @@ fn extract_policy_targets(policies: &Policies) -> Vec<String> {
 }
 
 fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResult {
-    let result = match attribute_type {
+    let result = match &attribute_type {
         Block(attributes) => {
-            match &attributes[0].value {
-                Str(val) => val == &filter.value,
-                Num(val) => val == &filter.value.parse::<f64>().unwrap(),
-                // TODO: accommodate all variants
-                _ => false,
+            if &attributes.len() > &0 {
+                match &attributes[0].value {
+                    Str(val) => val == &filter.value,
+                    Num(val) => val == &filter.value.parse::<f64>().unwrap(),
+                    // TODO: accommodate all variants
+                    _ => false,
+                }
+            } else {
+                println!("found bad attribute: {:?}", &attribute_type);
+                false
             }
         },
-        Str(val) => val == filter.value,
-        Num(val) => val == filter.value.parse::<f64>().unwrap(),
+        Str(val) => val == &filter.value,
+        Num(val) => val == &filter.value.parse::<f64>().unwrap(),
         // TODO: accommodate all variants
         _ => false,
     };
@@ -76,7 +97,6 @@ fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
             TFQueryResult::None => FilterResult::new(filter.clone(), false),
         }
     }).collect();
-    println!("filters: {:?}", filters);
 
     let combined_result = filters.iter().fold(true, |acc, x| acc && x.result);
 
@@ -102,8 +122,8 @@ fn query_resources<'a>(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Pol
                         Some(results) => {
                             let mut bla = results.clone();
                             bla.push(policy_results);
-                            println!("old vec: {:?}", existing_policy_results);
-                            println!("new vec: {:?}", bla);
+                            // println!("old vec: {:?}", existing_policy_results);
+                            // println!("new vec: {:?}", bla);
                             results_map.insert(resource.get_id(), bla.to_vec());
                         },
                         None => {
@@ -122,7 +142,6 @@ pub fn evaluate(policies: Policies, resources: &Vec<TerraformBlock>) -> HashMap<
     let mut cache: HashMap<&str, Vec<&TerraformBlock>> = HashMap::new();
 
     let resource_targets = extract_policy_targets(&policies);
-    // println!("resource_targets: {:?}", &resource_targets);
 
     for target_resource in &resource_targets {
         let filtered_resources: &Vec<&TerraformBlock> = &resources.iter().filter(|&resource| {
@@ -132,16 +151,12 @@ pub fn evaluate(policies: Policies, resources: &Vec<TerraformBlock>) -> HashMap<
                 TerraformBlock::WithTwoIdentifiers(tf_block) => &tf_block.first_identifier == target_resource,
             }
         }).collect();
-        // println!("filtered_resources: {:?}", filtered_resources);
 
         cache.insert(target_resource, filtered_resources.clone());
     }
-    // println!("cache: {:?}", &cache);
 
     let policy_results = query_resources(cache, policies);
     
-    println!("policies: {:?}", policy_results);
-
     policy_results
 }
 

@@ -1,3 +1,4 @@
+use std::fmt;
 use serde::{Deserialize, Serialize};
 use std::clone::Clone;
 
@@ -11,6 +12,12 @@ pub struct Filter {
 impl Filter {
     pub fn new(key: &str, op: &str, value: &str) -> Filter {
         Filter { key: key.to_owned(), op: op.to_owned(), value: value.to_owned() }
+    }
+}
+
+impl fmt::Display for Filter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{\"key\":\"{}\",\"op\":\"{}\",\"value\":\"{}\"}}", self.key, self.op, self.value)
     }
 }
 

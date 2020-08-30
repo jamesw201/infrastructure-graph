@@ -62,7 +62,6 @@ pub mod tf_block_query {
     /// traverse a tf_block given a jmespath expression
     pub fn jmespath_query(tf_block: &TerraformBlockWithTwoIdentifiers, jmespath_expression: &str) -> TFQueryResult {
         let expression = parse_jmespath(jmespath_expression);
-        println!("expression: {:?}", expression);
 
         let result = tf_block.query(expression);
 

@@ -7,12 +7,12 @@ use PathPart::{ List, Scalar};
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone, PartialOrd)]
 pub enum JsonValue {
-  Str(String),
-  Boolean(bool),
-  Null(String),
-  Num(f64),
-  Array(Vec<JsonValue>),
-  Object(Vec<(String, JsonValue)>),
+    Str(String),
+    Boolean(bool),
+    Null(String),
+    Num(f64),
+    Array(Vec<JsonValue>),
+    Object(Vec<(String, JsonValue)>),
 }
 
 impl JsonValue {
@@ -83,8 +83,6 @@ impl Queryable for JsonValue {
 
             Some(attribute_array)
         } else {
-            // println!("JsonValue attribute {:?}", &self);
-
             // if path_part is a List then the the target has to be a List also?
             match &expression.path_parts[0] {
                 List(path) => {
