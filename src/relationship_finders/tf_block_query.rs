@@ -7,7 +7,7 @@
 /// 
 
 use crate::json::{parse_json};
-
+use crate::structs::traits::query::Queryable;
 use crate::structs::json::JsonValue;
 
 use crate::structs::template_string::{ TemplateString, BuiltInFunction };
@@ -20,19 +20,16 @@ use crate::structs::terraform_block::{
     TerraformBlockWithTwoIdentifiers,
 };
 
-mod tf_block_query {
+pub mod tf_block_query {
     use super::{ Attribute, AttributeType, TerraformBlockWithTwoIdentifiers };
     use super::JsonValue;
+    use super::Queryable;
 
     #[derive(PartialEq, Debug, Clone)]
     pub enum PathPart {
         List(String),
         Scalar(String),
     }
-    // pub struct PathPart {
-    //     pub part: String,
-    //     pub is_array: bool,
-    // }
 
     #[derive(PartialEq, Debug, Clone)]
     pub struct JmespathExpression {
@@ -62,45 +59,16 @@ mod tf_block_query {
         JmespathExpression { path_parts }
     }
 
-    fn find_attribute(attrs: Vec<AttributeType>) -> Option<AttributeType> {
-        attrs.into_iter().find(|value| {
-            match value {
-                AttributeType::Json(json) => {
-                    println!("found Json: {:?}", json);
-                    false
-                },
-                attr => {
-                    println!("found Attribute: {:?}", attr);
-                    true
-                },
-            }
-        })
-    }
-
-    pub fn recurse(path_parts: Vec<PathPart>, attrs: Vec<AttributeType>) -> Option<AttributeType> {
-        println!("path_parts: {:?}", path_parts[0]);
-        if path_parts.len() == 1 {
-            println!("path_part: {:?}", path_parts[0]);
-            find_attribute(attrs)
-        } else {
-            let found = find_attribute(attrs);
-            match found {
-                Some(attr_type) => recurse(path_parts[1..].to_vec(), vec![attr_type]),
-                None => None
-            }
-        }
-    }
-
     /// traverse a tf_block given a jmespath expression
     pub fn jmespath_query(tf_block: &TerraformBlockWithTwoIdentifiers, jmespath_expression: &str) -> TFQueryResult {
         let expression = parse_jmespath(jmespath_expression);
-        println!("expression: {:?}", expression);
 
-        // TODO: Check if path_parts.len() == 1 and any Attributes match
+        let result = tf_block.query(expression);
 
-        // The point is to search through data structures for given attributes
-        let attr = AttributeType::Str(String::from("sandbox1"));
-        TFQueryResult::Scalar(attr)
+        match result {
+            Some(attr) => TFQueryResult::Scalar(attr),
+            None => TFQueryResult::None,
+        }
     }
 }
 
@@ -179,24 +147,6 @@ mod tests {
     }
 
     #[test]
-    fn recursion() {
-        let data = vec![
-            AttributeType::Str(String::from("some attribute")),
-            AttributeType::Json(JsonValue::Str(String::from("json root attribute"))),
-            AttributeType::Json(JsonValue::Str(String::from("uninteresting attribute"))),
-        ];
-        let path_parts = vec![
-            PathPart::Scalar(String::from("policy")),
-            PathPart::List(String::from("Statement")),
-            PathPart::Scalar(String::from("resource")),
-        ];
-        // let result = tf_block_query::recurse(path_parts, example_resource().attributes);
-        let expected = Some(AttributeType::Json(JsonValue::Str(String::from("bongo"))));
-        // assert_eq!(result, expected)
-        assert_eq!(1, 2)
-    }
-
-    #[test]
     fn parse_jmespath_expression() {
         let result = tf_block_query::parse_jmespath("policy.Statement[].resource");
 
@@ -213,31 +163,50 @@ mod tests {
 
         let result = tf_block_query::jmespath_query(&resource, "policy.Statement[].Resource");
 
-        let expected = tf_block_query::TFQueryResult::List(
-            vec![
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"))),
-                AttributeType::Json(JsonValue::Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))),
-            ]
+        // TODO: remove the need for AttributeType to be returned, allow for:
+        // enum QueryResult {
+        //     AttributeList(Vec<Attribute>),
+        //     ValueList(Vec<AttributeType>),
+        //     Attribute(Attribute),
+        //     Value(AttributeType),
+        // }
+        let expected = tf_block_query::TFQueryResult::Scalar(
+            Array(vec![
+                Block(vec![
+                    Attribute { key: String::from("Resource"), value: Array(vec![
+                        Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))]) 
+                    }, 
+                    Attribute { key: String::from("Resource"), value: Array(vec![
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*")), 
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config")), 
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))])
+                    }, 
+                    Attribute { key: String::from("Resource"), value: Array(vec![
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
+                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))])
+                    }, 
+                    Attribute { key: String::from("Resource"), value: Array(vec![
+                        Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"))])
+                    }, 
+                    Attribute { key: String::from("Resource"), value: Array(vec![
+                        Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))])
+                    }
+                ])
+            ])
         );
         assert_eq!(result, expected)
     }
 
-    // #[test]
-    // fn deduplicate_resources() {
-    //     //    "arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key"
-    //     //    and
-    //     //    "arn:aws:dynamodb:us-east-1:309983114184:table/authentication_key/*"
-    //     // s
-    //     //    should result in a single relationship.
-    //     let result = tf_block_query::parse_jmespath("policy.Statement[].resource");
+    #[test]
+    fn query_tf_block_for_single_root_attribute() {
+        let resource = example_resource();
 
-    //     assert_eq!(1,2)
-    // }
+        let result = tf_block_query::jmespath_query(&resource, "depends_on");
+
+        let expected = tf_block_query::TFQueryResult::Scalar(
+            Array(vec![AttributeType::Str(String::from("aws_iam_role.discovery_scheduler_role"))])
+        );
+        assert_eq!(result, expected)
+    }
 }

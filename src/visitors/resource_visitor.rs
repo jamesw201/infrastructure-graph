@@ -3,18 +3,18 @@ use std::collections::HashMap;
 
 use crate::structs::terraform_block::{
     TerraformBlock,
+    TerraformBlockWithTwoIdentifiers,
 };
 
 use crate::visitors::visitor::Visitor;
 use crate::visitors::json_visitor::JsonVisitor;
+use crate::structs::policies::Policies;
 use crate::visitors::relationship_visitor::{RelationshipVisitor, Relationship};
 use crate::relationship_finders::relationship_finder::RelationshipFinder;
+use crate::policy_evaluator;
 
-// fn print_type_of<T>(_: &T) {
-//     println!("{}", std::any::type_name::<T>())
-// }
 
-pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap<String, Relationship>) -> String {
+pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap<String, Relationship>, policies: Policies) -> String {
     let mut vec = Vec::new();
 
     let json_visitor = JsonVisitor{relationships: RefCell::new(vec)};
@@ -25,7 +25,12 @@ pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap
     let json_resources_joined = json_resources.join(",");
     let relationships = visitor.output_relationships();
 
-    format!("{{\"resources\":[{}],\"relationships\":{}}}", json_resources_joined, relationships)
+    let policy_results = policy_evaluator::evaluate(policies, resources);
+
+    let serialized = serde_json::to_string(&policy_results).unwrap();
+
+
+    format!("{{\"resources\":[{}],\"relationships\":{},\"policy_results\":{}}}", json_resources_joined, relationships, serialized)
 }
 
 #[cfg(test)]

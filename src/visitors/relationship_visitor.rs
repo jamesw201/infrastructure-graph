@@ -95,7 +95,12 @@ impl RelationshipVisitor {
                 //     Some(position) => Some(format!("aws_s3_bucket.{}", &tokens[5][0..position])),
                 //     None => Some(format!("aws_s3_bucket.{}", tokens[5])),
                 // }
-                Some(format!("aws_s3_bucket.{}", tokens[5]))
+                if tokens[5].ends_with("/*") {
+                    let without_wildcard = tokens[5].len() - 2;
+                    Some(format!("aws_s3_bucket.{}", &tokens[5][0..without_wildcard]))
+                } else {
+                    Some(format!("aws_s3_bucket.{}", tokens[5]))
+                }
             },
             "lambda" => Some(format!("aws_lambda_function.{}", tokens[6])),
             "sqs" => Some(format!("aws_sqs_queue.{}", tokens[5])),
@@ -362,24 +367,6 @@ impl Visitor<String> for RelationshipVisitor {
 mod tests {
     use super::*;
 
-    struct MockJsonVisitor {
-        pub relationships: Vec<String>,
-    }
-
-    impl Visitor<String> for MockJsonVisitor {
-        fn visit_str(&self, value: &String) -> String { String::from("") }
-        fn visit_template_string(&self, value: &TemplateString) -> String { String::from("") }
-        fn visit_boolean(&self, value: &bool) -> String { String::from("") }
-        fn visit_num(&self, value: &f64) -> String { String::from("") }
-        fn visit_block(&self, value: &Vec<Attribute>) -> String { String::from("") }
-        fn visit_array(&self, value: &Vec<AttributeType>) -> String { String::from("") }
-        fn visit_tfblock(&self, value: &TerraformBlock) -> String { String::from("") }
-        fn visit_attribute(&self, value: &Attribute) -> String { String::from("") }
-        fn visit_json(&self, value: &JsonValue) -> String { String::from("") }
-        fn visit_json_array(&self, value: &Vec<JsonValue>) -> String { String::from("") }
-        fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> String { String::from("") }
-    }
-
     #[test]
     fn relationship_visitor_test() {
         let resource1 = WithOneIdentifier(
@@ -418,9 +405,9 @@ mod tests {
     }
 
     #[test]
-    fn arn_conversion_s3_ending_in_slash() {
+    fn arn_conversion_s3_ending_in_wildcard() {
         let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:s3:::acp-platform-s-discovery-sandbox1/env/*"));
-        let expected = Some(String::from("aws_s3_bucket.acp-platform-s-discovery-sandbox1"));
+        let expected = Some(String::from("aws_s3_bucket.acp-platform-s-discovery-sandbox1/env"));
         assert_eq!(result, expected)
     }
 

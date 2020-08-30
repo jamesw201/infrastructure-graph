@@ -35,6 +35,11 @@ cargo build --release
 - Parse cloud-custodian policies and turn them into AST-like structure. This way the tool can even do checks on the Policies to ensure they are sound.
 - End-goal: have a separate repo for policies which builds a binary of them. This can then be pulled each time the tool is run to get up to date Policies.
 
+- Possible front-end inspiration:
+    - https://dzone.com/articles/getting-started-with-regraph-the-graph-visualizati
+    - https://www.youtube.com/watch?v=rchL4vWnamQ
+(forget that it was created by bad people)
+
 
 # Tasks
 [√] build basic tests for the CloudTemplateParser construct  
@@ -65,12 +70,21 @@ cargo build --release
 
 [√] create react diagrams from the output of the AST  
 
-[ ] build mechanism for traversing AST by simple jmespath expressions  
+[√] build mechanism for traversing AST by simple jmespath expressions  
 
-[ ] create security policies which run against the AST  
+[√] create security policies which run against the AST  
+
+[√] build FE skeleton structure with menus and tabbed viewing spaces like the regraph setup  
+
 
 [ ] show security violations on the react FE, overlays will highlight the offending resources
 and show a code snippet of the offending template lines  
+
+[ ] add diagnostic stats to the output and display it in the FE  
+
+[ ] investigate converting the abstract structure into a graph structure. This will be better for Policy checking   
+
+[ ] refactor the policy visitor to work against a graph structure  
 
 [ ] create rdf transform from AST  
 

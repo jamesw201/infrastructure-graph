@@ -1,0 +1,37 @@
+# policies to be run against cloud resources
+policies:
+ - name: find-nodesjs-lambdas
+   description: Toy policy that checks the names of aws_iam_role_policy resources
+   resource: aws_lambda_function
+   filters:
+     - key: handler
+       op: eq
+       value: "index.handler"
+     - key: memory_size
+       op: eq
+       value: "128.0"
+
+ - name: policy-id-check
+   description: Toy policy that checks the names of aws_iam_role_policy resources
+   resource: aws_iam_role_policy
+   filters:
+     - key: visibility_timeout_seconds
+       op: eq
+       value: "3.1"
+ 
+ - name: sqs-max-receive-count-check
+   description: blarp
+   resource: aws_sqs_queue
+   filters:
+     - key: redrive_policy.maxReceiveCount
+       op: eq
+       value: "3.1"
+
+ - name: sqs-has-inline-policy
+   description: blarp
+   resource: aws_sqs_queue
+   filters:
+     - key: policy.Version
+       op: eq
+       value: "2012-10-17"
+ 
