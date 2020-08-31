@@ -36,8 +36,6 @@ impl JsonValue {
 
 impl Queryable for JsonValue {
     fn query(&self, expression: JmespathExpression) -> Option<AttributeType> {
-        println!("JsonValue expression {:?}", expression);
-
         if expression.path_parts.len() == 1 {
             // println!("JsonValue {:?}", self);
 

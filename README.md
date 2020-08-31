@@ -76,9 +76,11 @@ cargo build --release
 
 [√] build FE skeleton structure with menus and tabbed viewing spaces like the regraph setup  
 
+[√] show security violations on the react FE  
 
-[ ] show security violations on the react FE, overlays will highlight the offending resources
-and show a code snippet of the offending template lines  
+[√] highlight the offending resources and show a code snippet of the offending template lines  
+
+[√] output non-serialised json  
 
 [ ] add diagnostic stats to the output and display it in the FE  
 

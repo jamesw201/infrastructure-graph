@@ -47,8 +47,8 @@ pub enum Relationship {
 impl fmt::Display for Relationship {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &*self {
-            Relationship::BasicRelationship { source, target, label } => write!(f, "{{\"in\":\"{}\",\"out\":\"{}\",\"label\":\"{}\"}}", source, target, label),
-            Relationship::NestedRelationship { source, targets } => write!(f, "{{\"in\":\"{}\",\"out\":\"{}\",\"label\":\"{}\"}}", source, targets.target, targets.label),
+            Relationship::BasicRelationship { source, target, label } => write!(f, r#"{{"in":"{}","out":"{}","label":"{}"}}"#, source, target, label),
+            Relationship::NestedRelationship { source, targets } => write!(f, r#"{{"in":"{}","out":"{}","label":"{}"}}"#, source, targets.target, targets.label),
        }
     }
 }
@@ -266,7 +266,7 @@ impl Visitor<String> for RelationshipVisitor {
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!("{{\"type\":\"{}\",\"body\":{{{}}}}}", block_type, attributes_joined)
+                format!(r#"{{"type":"{}","body":{{{}}}}}"#, block_type, attributes_joined)
             },
             WithOneIdentifier(
                 TerraformBlockWithOneIdentifier {
@@ -278,7 +278,7 @@ impl Visitor<String> for RelationshipVisitor {
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!("{{\"type\":\"{}\",\"name\":\"{}\",\"body\":{{{}}}}}", block_type, first_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, block_type, first_identifier, attributes_joined)
             },
             WithTwoIdentifiers(
                 TerraformBlockWithTwoIdentifiers {
@@ -339,7 +339,7 @@ impl Visitor<String> for RelationshipVisitor {
 
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
-                format!("{{\"type\":\"{}\",\"name\":\"{}\",\"body\":{{{}}}}}", first_identifier, second_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, first_identifier, second_identifier, attributes_joined)
             },
         };
 

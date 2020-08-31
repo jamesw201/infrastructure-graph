@@ -4,6 +4,10 @@ use std::collections::HashMap;
 extern crate serde_yaml;
 use serde::{Deserialize};
 
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 use std::time::{Instant};
 use exitfailure::ExitFailure;
 
@@ -46,11 +50,11 @@ fn main() -> Result<(), ExitFailure> {
 
     let relationship_file = std::fs::File::open("./example_files/aws_relationships.yaml")?;
     let aws_relationship_specs: HashMap<String, Relationship> = serde_yaml::from_reader(relationship_file)?;
-    println!("Relationships YAML string: {:?}", aws_relationship_specs);
+    // println!("Relationships YAML string: {:?}", aws_relationship_specs);
 
     let policies_file = std::fs::File::open("./example_files/policies.yaml")?;
     let policy_specs: Policies = serde_yaml::from_reader(policies_file)?;
-    println!("Policies YAML string: {:?}", policy_specs);
+    // println!("Policies YAML string: {:?}", policy_specs);
 
     let parser = cloud_template_parser::CloudTemplateParser::new();
     let parsed_resources = parser.handle(args.path);
@@ -60,7 +64,20 @@ fn main() -> Result<(), ExitFailure> {
     // // then allow Visitor pattern to do the rest
     let elapsed_before_printing = start.elapsed();
 
-    println!("json: {:?}", json);
+    let path = Path::new("graph.json");
+    let display = path.display();
+
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why),
+        Ok(file) => file,
+    };
+
+    // Write json to file
+    match file.write_all(json.as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", display, why),
+        Ok(_) => println!("successfully wrote to {}", display),
+    }
+    // println!("json: {:?}", json);
     // println!("ast: {:?}", parsed_resources);
 
     let duration = start.elapsed();

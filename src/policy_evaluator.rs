@@ -27,7 +27,7 @@ impl FilterResult {
 
 impl fmt::Display for FilterResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{\"filter\":\"{}\",\"result\":\"{}\"}}", self.filter, self.result)
+        write!(f, r#"{{"filter":"{}","result":"{}"}}"#, self.filter, self.result)
     }
 }
 
@@ -48,7 +48,7 @@ impl fmt::Display for PolicyResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let filters_str: Vec<String> = self.filters.iter().map(|filter| format!("{}", filter)).collect();
         let filters_joined: String = filters_str.join(",");
-        write!(f, "{{\"filters\":\"{}\",\"policy_id\":\"{}\",\"policy_result\":\"{}\"}}", filters_joined, self.policy_id, self.policy_result)
+        write!(f, r#"{{"filters":"{}","policy_id":"{}","policy_result":"{}"}}"#, filters_joined, self.policy_id, self.policy_result)
     }
 }
 
