@@ -49,10 +49,10 @@ impl RelationshipFinder for JsonVisitor {
 impl Visitor<String> for JsonVisitor {
     fn visit_str(&self, value: &String) -> String {
         let mut s = String::new();
-        s.push_str("\"");
+        s.push_str(r#"""#);
         let res = &value.replace("'", "");
         s.push_str(res);
-        s.push_str("\"");
+        s.push_str(r#"""#);
         s
     }
 
@@ -62,14 +62,14 @@ impl Visitor<String> for JsonVisitor {
             BuiltInFunction(bif) => String::from("builtinfunction"),
         };
         let mut s = String::new();
-        s.push_str("\"");
+        s.push_str(r#"""#);
         let res = if val.contains("md5") {
             ""
         } else {
             &val
         };
         s.push_str(res);
-        s.push_str("\"");
+        s.push_str(r#"""#);
         s
     }
 
@@ -79,18 +79,18 @@ impl Visitor<String> for JsonVisitor {
             false => "false",
         };
         let mut s = String::new();
-        s.push_str("\"");
+        s.push_str(r#"""#);
         s.push_str(bstring);
-        s.push_str("\"");
+        s.push_str(r#"""#);
         s
     }
 
     fn visit_num(&self, value: &f64) -> String {
         let mut s = String::new();
-        s.push_str("\"");
+        s.push_str(r#"""#);
         let num_str = format!("{:.1}", &value);
         s.push_str(&num_str);
-        s.push_str("\"");
+        s.push_str(r#"""#);
         s
     }
 
@@ -136,7 +136,7 @@ impl Visitor<String> for JsonVisitor {
     fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> String {
         let array_items: Vec<String> = value.into_iter()
             .map(|(key, val)| {
-                format!("\"{}\":{}", key, self.visit_json(&val))
+                format!(r#""{}":{}"#, key, self.visit_json(&val))
             }).collect();
 
         let array_items_joined = array_items.join(",");
@@ -167,7 +167,7 @@ impl Visitor<String> for JsonVisitor {
             Json(json_inside) => self.visit_json(json_inside),
         };
 
-        format!("\"{}\":{}", &attr.key, value)
+        format!(r#""{}":{}"#, &attr.key, value)
     }
 
     fn visit_tfblock(&self, value: &TerraformBlock) -> String {
@@ -181,7 +181,7 @@ impl Visitor<String> for JsonVisitor {
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!("{{\"type\":\"{}\",\"body\":{{{}}}}}", block_type, attributes_joined)
+                format!(r#"{{"type":"{}","body":{{{}}}}}"#, block_type, attributes_joined)
             },
             WithOneIdentifier(
                 TerraformBlockWithOneIdentifier {
@@ -193,7 +193,7 @@ impl Visitor<String> for JsonVisitor {
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!("{{\"type\":\"{}\",\"name\":\"{}\",\"body\":{{{}}}}}", block_type, first_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, block_type, first_identifier, attributes_joined)
             },
             WithTwoIdentifiers(
                 TerraformBlockWithTwoIdentifiers {
@@ -205,7 +205,7 @@ impl Visitor<String> for JsonVisitor {
             ) => {
                 let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
-                format!("{{\"type\":\"{}\",\"name\":\"{}\",\"body\":{{{}}}}}", first_identifier, second_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, first_identifier, second_identifier, attributes_joined)
             },
         }
     }

@@ -29,8 +29,7 @@ pub fn dispatch(resources: &Vec<TerraformBlock>, aws_relationship_specs: HashMap
 
     let serialized = serde_json::to_string(&policy_results).unwrap();
 
-
-    format!("{{\"resources\":[{}],\"relationships\":{},\"policy_results\":{}}}", json_resources_joined, relationships, serialized)
+    format!(r#"{{"resources":[{}],"relationships":{},"policy_results":{}}}"#, json_resources_joined, relationships, serialized)
 }
 
 #[cfg(test)]
