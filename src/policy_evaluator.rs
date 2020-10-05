@@ -104,7 +104,6 @@ fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
 }
 
 // TODO: Return a HashMap<Policy, Vec<PolicyResult>>
-// fn query_resources(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Policies) -> HashMap<Policy, Vec<PolicyResult>> {
 fn query_resources<'a>(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Policies) -> HashMap<String, Vec<PolicyResult>> {
     let mut results_map: HashMap<String, Vec<PolicyResult>> = HashMap::new();
 
@@ -120,11 +119,11 @@ fn query_resources<'a>(cache: HashMap<&str, Vec<&TerraformBlock>>, policies: Pol
 
                     match existing_policy_results {
                         Some(results) => {
-                            let mut bla = results.clone();
-                            bla.push(policy_results);
+                            let mut results_clone = results.clone();
+                            results_clone.push(policy_results);
                             // println!("old vec: {:?}", existing_policy_results);
-                            // println!("new vec: {:?}", bla);
-                            results_map.insert(resource.get_id(), bla.to_vec());
+                            // println!("new vec: {:?}", results_clone);
+                            results_map.insert(resource.get_id(), results_clone.to_vec());
                         },
                         None => {
                             results_map.insert(resource.get_id(), vec![policy_results]);
@@ -177,30 +176,18 @@ mod tests {
     fn setup_policies() -> Policies {
         Policies {
             policies: vec![
-                Policy {
-                    name: String::from("example-do-policy-name-check"),
-                    description: String::from("balbabal"),
-                    resource: String::from("aws_iam_role_policy"),
-                    filters: vec![
-                        Filter::new("policy.maxReceiveCount", "eq", "2.0"),
-                    ],
-                },
-                Policy {
-                    name: String::from("example-do-ec2-id-check"),
-                    description: String::from("balbabal"),
-                    resource: String::from("aws_ec2_instance"),
-                    filters: vec![
-                        Filter::new("id", "eq", "id-that-we-are-looking-for2"),
-                    ],
-                },
-                Policy {
-                    name: String::from("policy-id-check"),
-                    description: String::from("balbabal"),
-                    resource: String::from("aws_iam_role_policy"),
-                    filters: vec![
-                        Filter::new("visibility_timeout_seconds", "eq", "3.1"),
-                    ],
-                },
+                Policy::new(
+                    "example-do-policy-name-check", "balbabal", "aws_iam_role_policy", 
+                    vec![Filter::new("policy.maxReceiveCount", "eq", "2.0")]
+                ),
+                Policy::new(
+                    "example-do-ec2-id-check", "description...", "aws_ec2_instance", 
+                    vec![Filter::new("id", "eq", "id-that-we-are-looking-for2")]
+                ),
+                Policy::new(
+                    "policy-id-check", "balbabal", "aws_iam_role_policy", 
+                    vec![Filter::new("visibility_timeout_seconds", "eq", "3.1")]
+                ),
             ]
         }
     }
@@ -259,11 +246,7 @@ mod tests {
     fn evaluate_filter_test() {
         let policies = setup_policies();
 
-        let filter = Filter {
-            key: String::from("policy.maxReceiveCount"),
-            op: String::from("eq"),
-            value: String::from("2.0"),
-        };
+        let filter = Filter::new("policy.maxReceiveCount", "eq", "2.0");
         let filter_result = FilterResult::new(filter, true);
 
         let attribute_input = AttributeType::Block(
@@ -279,14 +262,8 @@ mod tests {
         let policies = setup_policies();
 
         let result = evaluate_policy(&policies.policies[0], &resources[0]);
-        let filter_result = FilterResult {
-            filter: Filter {
-                key: String::from("policy.maxReceiveCount"),
-                op: String::from("eq"),
-                value: String::from("2.0"),
-            },
-            result: true,
-        };
+        let filter = Filter::new("policy.maxReceiveCount", "eq", "2.0"); 
+        let filter_result = FilterResult::new(filter, true);
         let expected = PolicyResult{
             filters: vec![filter_result],
             policy_id: policies.policies[0].name.to_string(),
@@ -299,7 +276,6 @@ mod tests {
     #[test]
     fn unique_policy_resources_test() {
         let policies = setup_policies();
-
         let result = extract_policy_targets(&policies);
         assert_eq!(result, vec![String::from("aws_iam_role_policy"), String::from("aws_ec2_instance")])
     }
@@ -320,14 +296,14 @@ mod tests {
         let filter_result2= FilterResult::new(f2, false);
         let filter_result3 = FilterResult::new(f3, false);
 
-        let policyResult1 = PolicyResult::new(vec![filter_result1.clone()], policies_clone.policies[0].name.to_string(), false);
-        let policyResult2 = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
-        let policyResult2_clone = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
-        let policyResult3 = PolicyResult::new(vec![filter_result3.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policy_result_1 = PolicyResult::new(vec![filter_result1.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policy_result_2 = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policy_result_2_clone = PolicyResult::new(vec![filter_result2.clone()], policies_clone.policies[0].name.to_string(), false);
+        let policy_result_3 = PolicyResult::new(vec![filter_result3.clone()], policies_clone.policies[0].name.to_string(), false);
         
-        expected_map.insert(resources[2].get_id(), vec![policyResult1]);
-        expected_map.insert(resources[0].get_id(), vec![policyResult2]);
-        expected_map.insert(resources[1].get_id(), vec![policyResult2_clone, policyResult3]);
+        expected_map.insert(resources[2].get_id(), vec![policy_result_1]);
+        expected_map.insert(resources[0].get_id(), vec![policy_result_2]);
+        expected_map.insert(resources[1].get_id(), vec![policy_result_2_clone, policy_result_3]);
 
         assert_eq!(result.contains_key(&resources[0].get_id()), true);
         assert_eq!(result.contains_key(&resources[1].get_id()), true);

@@ -35,6 +35,12 @@ pub struct Policy {
     pub filters: Vec<Filter>,
 }
 
+impl Policy {
+    pub fn new(name: &str, description: &str, resource: &str, filters: Vec<Filter>) -> Policy {
+        Policy { name: name.to_owned(), description: description.to_owned(), resource: resource.to_owned(), filters }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Policies {
     pub policies: Vec<Policy>,
