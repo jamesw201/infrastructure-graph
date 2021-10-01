@@ -82,19 +82,32 @@ cargo build --release
 
 [√] output non-serialised json  
 
+[√] refactor the terraform/json structs to bring them into line with each other  
+
+[√] refactor Relationship model to use the same jmespath capability as Policy uses  
+
+[√] clean up and improve tests by enabling json data as input  
+
+[ ] create config driven model for occluding resources from the graph  
+
+[ ] add support for cloudformation templates  
+[ ] add support for azure templates  
+[ ] add support for google templates  
+
+[ ] add a wide range of security policies  
+
 [ ] add diagnostic stats to the output and display it in the FE  
 
 [ ] investigate converting the abstract structure into a graph structure. This will be better for Policy checking   
 
-[ ] refactor the policy visitor to work against a graph structure  
-
 [ ] create rdf transform from AST  
+[ ] create neo4j cypher transform from AST  
+
+[ ] demonstrate discovery/inventory capabilities  
 
 [ ] deploy to lambda function  
 [ ] query the AST  
 [ ] create SRE pipeline including notebooks and Slack alarm posts  
-
-[ ] refactor the terraform/json structs to bring them into line with each other
 
 [ ] use machine learning to build intuitions based on the AST and supporting data  
 [ ] show graph changes over time in React app  

@@ -1,0 +1,67 @@
+{
+    "type": "aws_iam_role_policy",
+    "name": "discovery_scheduler_role_policy",
+    "body": {
+        "depends_on": [
+            "aws_iam_role.discovery_scheduler_role"
+        ],
+        "policy": {
+            "Statement": [
+                {
+                    "Action": [
+                        "logs:CreateLogStream",
+                        "logs:CreateLogGroup",
+                        "logs:PutLogEvents"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"
+                    ]
+                },
+                {
+                    "Action": [
+                        "dynamodb:Scan"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*",
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config",
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*",
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"
+                    ]
+                },
+                {
+                    "Action": [
+                        "dynamodb:UpdateItem"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*",
+                        "arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"
+                    ]
+                },
+                {
+                    "Action": [
+                        "sns:Publish"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"
+                    ]
+                },
+                {
+                    "Action": [
+                        "events:DescribeRule"
+                    ],
+                    "Effect": "Allow",
+                    "Resource": [
+                        "arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"
+                    ]
+                }
+            ],
+            "Version": "2012-10-17"
+        },
+        "role": "aws_iam_role.discovery_scheduler_role.id",
+        "name": "discovery_scheduler_role_policy"
+    }
+}

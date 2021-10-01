@@ -5362,7 +5362,7 @@ resource "aws_lambda_function" "discovery_decommission" {
     handler              = "lib/index.handler"
     timeout              = 180
     memory_size          = 512
-    runtime              = "nodejs8.10"
+    runtime              = "nodejs8.11"
     lifecycle {
       ignore_changes     = ["handler", "environment"]
     }

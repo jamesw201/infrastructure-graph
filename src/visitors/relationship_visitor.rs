@@ -1,15 +1,19 @@
 use std::cell::RefCell;
 use std::fmt;
+use std::error::Error;
 use std::marker::Copy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::relationship_finders::tf_block_query::tf_block_query::{ jmespath_query, TFQueryResult };
+
+use crate::visitors::relationship_finder::{ Relationship };
+
 use crate::structs::attributes::{ Attribute, AttributeType };
 use AttributeType::{
-    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+    Array, Block, Boolean, Num, Str, TFBlock, TemplatedString,
 };
 use crate::structs::template_string::{ TemplateString };
-use crate::structs::json::JsonValue;
 
 use TemplateString::{ Variable, BuiltInFunction };
 
@@ -29,29 +33,20 @@ use crate::visitors::visitor::{ Visitor };
 use crate::visitors::json_visitor::JsonVisitor;
 use crate::relationship_finders::relationship_finder::{RelationshipFinder};
 
+// #[derive(Serialize, Deserialize, Debug, PartialEq)]
+// #[serde(untagged)]
+// pub enum Relationship {
+//     BasicRelationship { source: String, target: String, label: String },  
+//     NestedRelationship { source: String, target: String, label: String },
+// }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct TargetAndLabel {
-    pub collection_path: String,
-    pub target: String,
-    pub label: String,
-}
+// #[derive(Serialize, Deserialize, Debug, PartialEq)]
+// pub struct Relationship {
+//     pub source: String,
+//     pub target: String,
+//     pub label: String,
+// }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(untagged)]
-pub enum Relationship {
-    BasicRelationship { source: String, target: String, label: String },
-    NestedRelationship { source: String, targets: TargetAndLabel }
-}
-
-impl fmt::Display for Relationship {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &*self {
-            Relationship::BasicRelationship { source, target, label } => write!(f, r#"{{"in":"{}","out":"{}","label":"{}"}}"#, source, target, label),
-            Relationship::NestedRelationship { source, targets } => write!(f, r#"{{"in":"{}","out":"{}","label":"{}"}}"#, source, targets.target, targets.label),
-       }
-    }
-}
 
 pub struct RelationshipVisitor {
     pub downstream_visitor: JsonVisitor,
@@ -143,92 +138,92 @@ impl RelationshipVisitor {
     }
 
     // build a TargetAndLabel from a policy statement object
-    fn handle_statements(&self, statements: &Vec<(String, JsonValue)>, collection_path: &str) -> Vec<TargetAndLabel> {    
-        let action = statements.into_iter().find(|(key, value)| key.as_str() == "Action");
-        // println!("action: {:?}", action);
-        let effect = statements.into_iter().find(|(key, value)| key.as_str() == "Effect");
-        // println!("effect: {:?}", effect);
-        let resource = statements.into_iter().find(|(key, value)| key.as_str() == "Resource");
-        // create a TargetAndLabel for each Resource found
-        let targets: Vec<Option<String>> = match resource {
-            Some((_, JsonValue::Array( items ))) => {
-                items.into_iter().map(|item| {
-                    match item {
-                        JsonValue::Str(val) => {
-                            Self::handle_resource(val)
-                        },
-                        anything => {
-                            println!("unknown type: {:?}", anything);
-                            None
-                        },
-                    }
-                }).collect()
-            },
-            _ => vec![],
-        };
+    // fn handle_statements(&self, statements: &Vec<(String, JsonValue)>, collection_path: &str) -> Vec<TargetAndLabel> {    
+    //     let action = statements.into_iter().find(|(key, value)| key.as_str() == "Action");
+    //     // println!("action: {:?}", action);
+    //     let effect = statements.into_iter().find(|(key, value)| key.as_str() == "Effect");
+    //     // println!("effect: {:?}", effect);
+    //     let resource = statements.into_iter().find(|(key, value)| key.as_str() == "Resource");
+    //     // create a TargetAndLabel for each Resource found
+    //     let targets: Vec<Option<String>> = match resource {
+    //         Some((_, JsonValue::Array( items ))) => {
+    //             items.into_iter().map(|item| {
+    //                 match item {
+    //                     JsonValue::Str(val) => {
+    //                         Self::handle_resource(val)
+    //                     },
+    //                     anything => {
+    //                         println!("unknown type: {:?}", anything);
+    //                         None
+    //                     },
+    //                 }
+    //             }).collect()
+    //         },
+    //         _ => vec![],
+    //     };
 
-        // loop through targets and add actions where a value is present
-        let mut withDuplicates: Vec<TargetAndLabel> = targets.into_iter().map(|target| {
-            let vals = match action {
-                Some((key, JsonValue::Array(strings))) => self.downstream_visitor.visit_json_array(strings).replace("\"", "'"),
-                _ => String::from(""),
-            };
-            let tget = match target {
-                Some(tget_val) => tget_val,
-                _ => String::from(""),
-            };
-            TargetAndLabel { collection_path: collection_path.to_string(), target: tget, label: vals}
-        }).collect();
+    //     // loop through targets and add actions where a value is present
+    //     let mut withDuplicates: Vec<TargetAndLabel> = targets.into_iter().map(|target| {
+    //         let vals = match action {
+    //             Some((key, JsonValue::Array(strings))) => self.downstream_visitor.visit_json_array(strings).replace("\"", "'"),
+    //             _ => String::from(""),
+    //         };
+    //         let tget = match target {
+    //             Some(tget_val) => tget_val,
+    //             _ => String::from(""),
+    //         };
+    //         TargetAndLabel { collection_path: collection_path.to_string(), target: tget, label: vals}
+    //     }).collect();
 
-        // TODO:
-        // [√] loop through targets and remove any duplicates
-        // [ ] apply rules for merging Relationships?
-        withDuplicates.dedup_by(|a, b| a.target == b.target);
-        withDuplicates
-    }
+    //     // TODO:
+    //     // [√] loop through targets and remove any duplicates
+    //     // [ ] apply rules for merging Relationships?
+    //     withDuplicates.dedup_by(|a, b| a.target == b.target);
+    //     withDuplicates
+    // }
 
-    pub fn extract_values(&self, attribute: Option<&Attribute>, collection_path: &str, target: &str, label: &str) -> Vec<TargetAndLabel> {
-        let dot_split = collection_path.split(".").collect::<Vec<&str>>();
+    // pub fn extract_values(&self, attribute: Option<&Attribute>, collection_path: &str, target: &str, label: &str) -> Vec<TargetAndLabel> {
+    //     let dot_split = collection_path.split(".").collect::<Vec<&str>>();
 
-        match attribute {
-            Some(Attribute { key, value: AttributeType::Json(JsonValue::Object( json_attributes )) }) => {
+    //     match attribute {
+    //         Some(Attribute { key, value: AttributeType::Json(JsonValue::Object( json_attributes )) }) => {
 
-                let nested_attr = json_attributes.into_iter().find(|&(attr, _)| attr == dot_split[1]);
+    //             let nested_attr = json_attributes.into_iter().find(|&(attr, _)| attr == dot_split[1]);
 
-                match nested_attr {
-                    Some((_, JsonValue::Array( elements ))) => { // mapping over statement objects to create
-                        elements.iter().flat_map(|obj:&JsonValue| {
-                            match obj {
-                                JsonValue::Object( elems ) => {
-                                    Self::handle_statements(&self, elems, collection_path)
-                                },
-                                _ => {
-                                    vec![]
-                                },
-                            }
-                        }).collect()
-                    },
-                    Some(_) => {
-                        vec![]
-                    },
-                    None => vec![],
-                }
-            },
-            Some(_) => vec![],
-            None => vec![]
-        }
-    }
+    //             match nested_attr {
+    //                 Some((_, JsonValue::Array( elements ))) => { // mapping over statement objects to create
+    //                     elements.iter().flat_map(|obj:&JsonValue| {
+    //                         match obj {
+    //                             JsonValue::Object( elems ) => {
+    //                                 Self::handle_statements(&self, elems, collection_path)
+    //                             },
+    //                             _ => {
+    //                                 vec![]
+    //                             },
+    //                         }
+    //                     }).collect()
+    //                 },
+    //                 Some(_) => {
+    //                     vec![]
+    //                 },
+    //                 None => vec![],
+    //             }
+    //         },
+    //         Some(_) => vec![],
+    //         None => vec![]
+    //     }
+    // }
 }
 
-impl RelationshipFinder for RelationshipVisitor {
-    fn add_relationship(&self, relationship: Relationship) {
-        self.downstream_visitor.relationships.borrow_mut().push(relationship);
-    }
+// impl RelationshipFinder for RelationshipVisitor {
+//     fn add_relationship(&self, relationship: Relationship) {
+//         self.downstream_visitor.relationships.borrow_mut().push(relationship);
+//     }
 
-    fn output_relationships(&self) -> String {
-        self.downstream_visitor.output_relationships()
-    }
-}
+//     fn output_relationships(&self) -> String {
+//         self.downstream_visitor.output_relationships()
+//     }
+// }
 
 impl Visitor<String> for RelationshipVisitor {
     fn visit_str(&self, value: &String) -> String {
@@ -257,89 +252,82 @@ impl Visitor<String> for RelationshipVisitor {
 
     fn visit_tfblock(&self, value: &TerraformBlock) -> String {
         let bla: String = match value {
-            NoIdentifiers(
-                TerraformBlockWithNoIdentifiers {
-                    block_type,
-                    attributes
-                }
-            ) => {
-                let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
+            NoIdentifiers(block) => {
+                let attributes_json: Vec<String> = block.attributes.iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!(r#"{{"type":"{}","body":{{{}}}}}"#, block_type, attributes_joined)
+                format!(r#"{{"type":"{}","body":{{{}}}}}"#, block.block_type, attributes_joined)
             },
-            WithOneIdentifier(
-                TerraformBlockWithOneIdentifier {
-                    block_type,
-                    first_identifier,
-                    attributes
-                }
-            ) => {
-                let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
+            WithOneIdentifier(block) => {
+                let attributes_json: Vec<String> = block.attributes.iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
 
-                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, block_type, first_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, block.block_type, &block.first_identifier, attributes_joined)
             },
-            WithTwoIdentifiers(
-                TerraformBlockWithTwoIdentifiers {
-                    block_type,
-                    first_identifier,
-                    second_identifier,
-                    attributes
+            WithTwoIdentifiers(block) => {
+                match self.aws_relationship_specs.get(&block.first_identifier) {
+                    Some(Relationship { source, target, label }) => {
+                        let source_t_string = jmespath_query(block, source);
+                        let target_t_string = jmespath_query(block, target);
+
+                        println!("source: {:?}, target: {:?}", source_t_string, target_t_string);
+                    },
+                    None => print!(""),
                 }
-            ) => {
-                match self.aws_relationship_specs.get(first_identifier) {
-                    Some(Relationship::BasicRelationship { source, target, label }) => {
+
+                // match self.aws_relationship_specs.get(first_identifier) {
+                //     Some(Relationship::BasicRelationship { source, target, label }) => {
                         // TODO: 
                         // [ ] break up the source/target strings into their jmespath expression tokens  
                         // [ ] recursively pass through the tokens to return leaf node value  
 
-                        let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
-                        let target_attr = attributes.into_iter().find(|&attr| attr.key == target.to_string());
+                    //     let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
+                    //     let target_attr = attributes.into_iter().find(|&attr| attr.key == target.to_string());
 
-                        let source_t_string = Self::extract_value(source_attr);
-                        let target_t_string = Self::extract_value(target_attr);
+                    //     let source_t_string = Self::extract_value(source_attr);
+                    //     let target_t_string = Self::extract_value(target_attr);
 
-                        fn hack_lambda_attributes(key: &String, val: String) -> String {
-                            if key == "function_name" && !val.contains(".") {
-                                "aws_lambda_function.".to_owned() + &val
-                            } else {
-                                val
-                            }
-                        }
+                    //     fn hack_lambda_attributes(key: &String, val: String) -> String {
+                    //         if key == "function_name" && !val.contains(".") {
+                    //             "aws_lambda_function.".to_owned() + &val
+                    //         } else {
+                    //             val
+                    //         }
+                    //     }
 
-                        if let Some(source_val) = source_t_string {
-                            if let Some(target_val) = target_t_string {
-                                let new_target = hack_lambda_attributes(target, target_val);
-                                let new_source = hack_lambda_attributes(source, source_val);
-                                let relationship = Relationship::BasicRelationship { source: new_source, target: new_target, label: String::from("") };
-                                self.downstream_visitor.add_relationship(relationship)
-                            }
-                        }
-                    },
-                    Some(Relationship::NestedRelationship { source, targets: TargetAndLabel { collection_path, target, label } }) => {
-                        let dot_split = collection_path.split(".").collect::<Vec<&str>>();
+                    //     if let Some(source_val) = source_t_string {
+                    //         if let Some(target_val) = target_t_string {
+                    //             let new_target = hack_lambda_attributes(target, target_val);
+                    //             let new_source = hack_lambda_attributes(source, source_val);
+                    //             let relationship = Relationship::BasicRelationship { source: new_source, target: new_target, label: String::from("") };
+                    //             self.downstream_visitor.add_relationship(relationship)
+                    //         }
+                    //     }
+                    // },
+                    // Some(Relationship::NestedRelationship { source, targets: TargetAndLabel { collection_path, target, label } }) => {
+                    // Some(Relationship::NestedRelationship { source, target, label } ) => {
+                        // let dot_split = collection_path.split(".").collect::<Vec<&str>>();
 
-                        let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
-                        let target_attr = attributes.into_iter().find(|&attr| attr.key == dot_split[0].to_string());
+                        // let source_attr = attributes.into_iter().find(|&attr| attr.key == source.to_string());
+                        // let target_attr = attributes.into_iter().find(|&attr| attr.key == dot_split[0].to_string());
 
-                        let source_t_string = Self::extract_value(source_attr);
-                        
-                        let targets_and_labels = Self::extract_values(&self, target_attr, collection_path, target, label);
-                        if let Some(source_val) = source_t_string {
-                            for target_and_label in targets_and_labels.into_iter() {
-                                let cloned_source = source_val.clone();
-                                let relationship = Relationship::NestedRelationship { source: cloned_source, targets: target_and_label };
-                                self.downstream_visitor.add_relationship(relationship)
-                            }
-                        }
-                    },
-                    None => print!(""),
-                };
+                        // let source_t_string = Self::extract_value(source_attr);
 
-                let attributes_json: Vec<String> = attributes.into_iter().map(|attr| self.visit_attribute(&attr)).collect();
+                        // let targets_and_labels = Self::extract_values(&self, target_attr, collection_path, target, label);
+                        // if let Some(source_val) = source_t_string {
+                        //     for target_and_label in targets_and_labels.into_iter() {
+                        //         let cloned_source = source_val.clone();
+                        //         let relationship = Relationship::NestedRelationship { source: cloned_source, targets: target_and_label };
+                        //         self.downstream_visitor.add_relationship(relationship)
+                        //     }
+                        // }
+                    // },
+                //     None => print!(""),
+                // };
+
+                let attributes_json: Vec<String> = block.attributes.iter().map(|attr| self.visit_attribute(&attr)).collect();
                 let attributes_joined = attributes_json.join(",");
-                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, first_identifier, second_identifier, attributes_joined)
+                format!(r#"{{"type":"{}","name":"{}","body":{{{}}}}}"#, block.first_identifier, block.second_identifier, attributes_joined)
             },
         };
 
@@ -349,100 +337,39 @@ impl Visitor<String> for RelationshipVisitor {
     fn visit_attribute(&self, value: &Attribute) -> String {
         self.downstream_visitor.visit_attribute(value)
     }
-
-    fn visit_json(&self, value: &JsonValue) -> String {
-        self.downstream_visitor.visit_json(value)
-    }
-
-    fn visit_json_array(&self, value: &Vec<JsonValue>) -> String {
-        self.downstream_visitor.visit_json_array(value)
-    }
-
-    fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> String {
-        self.downstream_visitor.visit_json_object(value)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn relationship_visitor_test() {
-        let resource1 = WithOneIdentifier(
-            TerraformBlockWithOneIdentifier {
-                block_type: String::from("resource"),
-                first_identifier: String::from("thing1"),
-                attributes: vec![
-                    Attribute {
-                        key: String::from("backend"),
-                        value: Str(String::from("s3"))
-                    },
-                    Attribute {
-                        key: String::from("bookend"),
-                        value: Boolean(true)
-                    }
-                ]
-            }
-        );
-        let expected = String::from(r#"{"type":"resource","name":"thing1","body":{"backend":"s3","bookend":"true"}}"#);
+    // #[test]
+    // fn relationship_visitor_test() {
+    //     let resource1 = WithOneIdentifier(
+    //         TerraformBlockWithOneIdentifier {
+    //             block_type: String::from("resource"),
+    //             first_identifier: String::from("thing1"),
+    //             attributes: vec![
+    //                 Attribute {
+    //                     key: String::from("backend"),
+    //                     value: Str(String::from("s3"))
+    //                 },
+    //                 Attribute {
+    //                     key: String::from("bookend"),
+    //                     value: Boolean(true)
+    //                 }
+    //             ]
+    //         }
+    //     );
+    //     let expected = String::from(r#"{"type":"resource","name":"thing1","body":{"backend":"s3","bookend":"true"}}"#);
         
-        let mut vec = Vec::new();
-        let mut h_map = HashMap::new();
-        let visitor = RelationshipVisitor{
-            downstream_visitor: JsonVisitor{relationships: RefCell::new(vec)},
-            aws_relationship_specs: h_map,
-        };  
-        let result = visitor.visit_tfblock(&resource1);
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_dynamo() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_provider-consistency"));
-        let expected = Some(String::from("aws_dynamodb_table.discovery_provider-consistency"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_s3_ending_in_wildcard() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:s3:::acp-platform-s-discovery-sandbox1/env/*"));
-        let expected = Some(String::from("aws_s3_bucket.acp-platform-s-discovery-sandbox1/env"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_s3() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:s3:::acp-platform-s-discovery-sandbox1"));
-        let expected = Some(String::from("aws_s3_bucket.acp-platform-s-discovery-sandbox1"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_sns() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:sns:us-east-1:309983114184:discovery_provider-inconsistency-topic"));
-        let expected = Some(String::from("aws_sns_topic.discovery_provider-inconsistency-topic"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_lambda() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:lambda:us-east-1:309983114184:function:discovery_provider-consistency-scheduler"));
-        let expected = Some(String::from("aws_lambda_function.discovery_provider-consistency-scheduler"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_sqs() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:sqs:us-east-1:309983114184:sre_auto-remediation-queue"));
-        let expected = Some(String::from("aws_sqs_queue.sre_auto-remediation-queue"));
-        assert_eq!(result, expected)
-    }
-
-    #[test]
-    fn arn_conversion_logs() {
-        let result = RelationshipVisitor::convert_arn_to_dot_syntax(&String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_remediate-missing-resources*"));
-        let expected = None;
-        assert_eq!(result, expected)
-    }
+    //     let mut vec = Vec::new();
+    //     let mut h_map = HashMap::new();
+    //     let visitor = RelationshipVisitor{
+    //         downstream_visitor: JsonVisitor{relationships: RefCell::new(vec)},
+    //         aws_relationship_specs: h_map,
+    //     };  
+    //     let result = visitor.visit_tfblock(&resource1);
+    //     assert_eq!(result, expected)
+    // }
 }

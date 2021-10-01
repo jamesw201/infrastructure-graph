@@ -8,12 +8,11 @@
 
 use crate::json::{parse_json};
 use crate::structs::traits::query::Queryable;
-use crate::structs::json::JsonValue;
 
 use crate::structs::template_string::{ TemplateString, BuiltInFunction };
 use crate::structs::attributes::{ Attribute, AttributeType };
 use AttributeType::{
-    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+    Array, Block, Boolean, Num, Str, TFBlock, TemplatedString,
 };
 
 use crate::structs::terraform_block::{
@@ -22,18 +21,18 @@ use crate::structs::terraform_block::{
 
 pub mod tf_block_query {
     use super::{ Attribute, AttributeType, TerraformBlockWithTwoIdentifiers };
-    use super::JsonValue;
+    // use super::JsonValue;
     use super::Queryable;
 
     #[derive(PartialEq, Debug, Clone)]
-    pub enum PathPart {
+    pub enum QueryPart {
         List(String),
         Scalar(String),
     }
 
     #[derive(PartialEq, Debug, Clone)]
     pub struct JmespathExpression {
-        pub path_parts: Vec<PathPart>,
+        pub path_parts: Vec<QueryPart>,
     }
 
     #[derive(PartialEq, Debug, Clone)]
@@ -46,13 +45,13 @@ pub mod tf_block_query {
     pub fn parse_jmespath(jmespath_expression: &str) -> JmespathExpression {
         let dot_split = jmespath_expression.split(".").collect::<Vec<&str>>();
 
-        let path_parts: Vec<PathPart> = dot_split.into_iter().map(|expr_part| {
+        let path_parts: Vec<QueryPart> = dot_split.into_iter().map(|expr_part| {
             if expr_part.ends_with("[]") {
                 let brackets_removed = expr_part[..expr_part.len()-2].to_string();
                 
-                PathPart::List(brackets_removed)
+                QueryPart::List(brackets_removed)
             } else {
-                PathPart::Scalar(expr_part.to_string())
+                QueryPart::Scalar(expr_part.to_string())
             }
         }).collect();
 
@@ -62,12 +61,24 @@ pub mod tf_block_query {
     /// traverse a tf_block given a jmespath expression
     pub fn jmespath_query(tf_block: &TerraformBlockWithTwoIdentifiers, jmespath_expression: &str) -> TFQueryResult {
         let expression = parse_jmespath(jmespath_expression);
+        let result = tf_block.query(&expression);
+        
+        // TODO: this is a hack, find a better representation in the Type instead
+        let is_list = expression.path_parts.iter().any(|part| {
+            match part {
+                QueryPart::List(_) => true,
+                _ => false,
+            }
+        });
 
-        let result = tf_block.query(expression);
-
-        match result {
-            Some(attr) => TFQueryResult::Scalar(attr),
-            None => TFQueryResult::None,
+        if result.len() > 0 {
+            if is_list {
+                TFQueryResult::List(result.clone())
+            } else {
+                TFQueryResult::Scalar(result[0].clone())
+            }
+        } else {
+            TFQueryResult::None
         }
     }
 }
@@ -89,52 +100,52 @@ mod tests {
                 },
                 Attribute {
                     key: String::from("policy"),
-                    value: Json(JsonValue::Object(vec![
-                        (String::from("Statement"), JsonValue::Array(vec![
-                            JsonValue::Object(vec![
-                                (String::from("Action"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("logs:CreateLogStream")), JsonValue::Str(String::from("logs:CreateLogGroup")), JsonValue::Str(String::from("logs:PutLogEvents"))
-                                ])),
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Resource"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))
-                                ]))
+                    value: AttributeType::Block(vec![
+                        Attribute { key: String::from("Statement"), value: AttributeType::Array(vec![
+                            AttributeType::Block(vec![
+                                Attribute { key: String::from("Action"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("logs:CreateLogStream")), AttributeType::Str(String::from("logs:CreateLogGroup")), AttributeType::Str(String::from("logs:PutLogEvents"))
+                                ])},
+                                Attribute { key: String::from("Effect"), value: AttributeType::Str(String::from("Allow")) },
+                                Attribute { key: String::from("Resource"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))
+                                ])}
                             ]),
-                            JsonValue::Object(vec![
-                                (String::from("Action"), JsonValue::Array(vec![JsonValue::Str(String::from("dynamodb:Scan"))])),
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Resource"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*")),
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config")),
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")),
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))
-                                ]))
+                            AttributeType::Block(vec![
+                                Attribute { key: String::from("Action"), value: AttributeType::Array(vec![AttributeType::Str(String::from("dynamodb:Scan"))])},
+                                Attribute { key: String::from("Effect"), value: AttributeType::Str(String::from("Allow"))},
+                                Attribute { key: String::from("Resource"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*")),
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config")),
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")),
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))
+                                ])}
                             ]),
-                            JsonValue::Object(vec![
-                                (String::from("Action"), JsonValue::Array(vec![JsonValue::Str(String::from("dynamodb:UpdateItem"))])),
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Resource"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")),
-                                    JsonValue::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))
-                                ]))
+                            AttributeType::Block(vec![
+                                Attribute { key: String::from("Action"), value: AttributeType::Array(vec![AttributeType::Str(String::from("dynamodb:UpdateItem"))])},
+                                Attribute { key: String::from("Effect"), value: AttributeType::Str(String::from("Allow"))},
+                                Attribute { key: String::from("Resource"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")),
+                                    AttributeType::Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))
+                                ])}
                             ]),
-                            JsonValue::Object(vec![
-                                (String::from("Action"), JsonValue::Array(vec![JsonValue::Str(String::from("sns:Publish"))])),
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Resource"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"))
-                                ]))
+                            AttributeType::Block(vec![
+                                Attribute { key: String::from("Action"), value: AttributeType::Array(vec![AttributeType::Str(String::from("sns:Publish"))])},
+                                Attribute { key: String::from("Effect"), value: AttributeType::Str(String::from("Allow"))},
+                                Attribute { key: String::from("Resource"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"))
+                                ])}
                             ]),
-                            JsonValue::Object(vec![
-                                (String::from("Action"), JsonValue::Array(vec![JsonValue::Str(String::from("events:DescribeRule"))])),
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Resource"), JsonValue::Array(vec![
-                                    JsonValue::Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))
-                                ]))
+                            AttributeType::Block(vec![
+                                Attribute { key: String::from("Action"), value: AttributeType::Array(vec![AttributeType::Str(String::from("events:DescribeRule"))])},
+                                Attribute { key: String::from("Effect"), value: AttributeType::Str(String::from("Allow"))},
+                                Attribute { key: String::from("Resource"), value: AttributeType::Array(vec![
+                                    AttributeType::Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))
+                                ])}
                             ])
-                        ])),
-                        (String::from("Version"), JsonValue::Str(String::from("2012-10-17")))
-                    ]))
+                        ])},
+                        Attribute { key: String::from("Version"), value: AttributeType::Str(String::from("2012-10-17")) }
+                    ])
                 },
                 Attribute {
                     key: String::from("role"), value: TemplatedString(TemplateString::Variable(String::from("aws_iam_role.discovery_scheduler_role.id")))
@@ -151,9 +162,9 @@ mod tests {
         let result = tf_block_query::parse_jmespath("policy.Statement[].resource");
 
         assert_eq!(result, JmespathExpression { path_parts: vec![
-            PathPart::Scalar(String::from("policy")),
-            PathPart::List(String::from("Statement")),
-            PathPart::Scalar(String::from("resource")),
+            QueryPart::Scalar(String::from("policy")),
+            QueryPart::List(String::from("Statement")),
+            QueryPart::Scalar(String::from("resource")),
         ]})
     }
 
@@ -163,37 +174,24 @@ mod tests {
 
         let result = tf_block_query::jmespath_query(&resource, "policy.Statement[].Resource");
 
-        // TODO: remove the need for AttributeType to be returned, allow for:
-        // enum QueryResult {
-        //     AttributeList(Vec<Attribute>),
-        //     ValueList(Vec<AttributeType>),
-        //     Attribute(Attribute),
-        //     Value(AttributeType),
-        // }
-        let expected = tf_block_query::TFQueryResult::Scalar(
-            Array(vec![
-                Block(vec![
-                    Attribute { key: String::from("Resource"), value: Array(vec![
-                        Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))]) 
-                    }, 
-                    Attribute { key: String::from("Resource"), value: Array(vec![
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*")), 
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config")), 
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))])
-                    }, 
-                    Attribute { key: String::from("Resource"), value: Array(vec![
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
-                        Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config"))])
-                    }, 
-                    Attribute { key: String::from("Resource"), value: Array(vec![
-                        Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic"))])
-                    }, 
-                    Attribute { key: String::from("Resource"), value: Array(vec![
-                        Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))])
-                    }
-                ])
-            ])
+        let expected = tf_block_query::TFQueryResult::List(
+            vec![
+                Array(vec![Str(String::from("arn:aws:logs:*:*:log-group:/aws/lambda/*discovery_scheduler*"))]), 
+                Array(vec![
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config/*")), 
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_collector-config")), 
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config")),
+                ]), 
+                Array(vec![
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config/*")), 
+                    Str(String::from("arn:aws:dynamodb:us-east-1:309983114184:table/discovery_tenant-config")),
+                ]), 
+                Array(vec![
+                    Str(String::from("arn:aws:sns:us-east-1:309983114184:discovery_scheduled-discovery-topic")),
+                ]), 
+                Array(vec![Str(String::from("arn:aws:events:us-east-1:309983114184:rule/discovery_scheduler-rule"))]),
+            ]
         );
         assert_eq!(result, expected)
     }
@@ -205,7 +203,11 @@ mod tests {
         let result = tf_block_query::jmespath_query(&resource, "depends_on");
 
         let expected = tf_block_query::TFQueryResult::Scalar(
-            Array(vec![AttributeType::Str(String::from("aws_iam_role.discovery_scheduler_role"))])
+            AttributeType::Array(
+                vec![
+                    AttributeType::Str(String::from("aws_iam_role.discovery_scheduler_role"))
+                ]
+            )
         );
         assert_eq!(result, expected)
     }

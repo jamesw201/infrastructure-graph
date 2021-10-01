@@ -6,3 +6,5 @@ pub mod visitors;
 pub mod relationship_finders;
 pub mod structs;
 pub mod policy_evaluator;
+pub mod json_to_model;
+pub mod occlusion_engine;

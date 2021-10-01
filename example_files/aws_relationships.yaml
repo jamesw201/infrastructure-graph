@@ -21,10 +21,15 @@ aws_lambda_event_source_mapping:
 
 aws_iam_role_policy:
     source: role
-    targets: 
-        collection_path: policy.Statement
-        target: Resource
-        label: Action
+    target: policy.Statement[].Resource
+    label: policy.Statement[].Action
+
+# aws_iam_role_policy:
+#     source: role
+#     targets: 
+#         collection_path: policy.Statement
+#         target: Resource
+#         label: Action
 
 # TODO: 
 # aws_ecs_task_definition

@@ -20,11 +20,9 @@ use crate::structs::terraform_block::{
 };
 
 use crate::structs::attributes::{ Attribute, AttributeType };
-use AttributeType::{
-    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
-};
+
 use crate::structs::template_string::{ TemplateString, BuiltInFunction };
-use crate::structs::json::JsonValue;
+
 use crate::json::{parse_json};
 
 use std::str;
@@ -103,7 +101,7 @@ fn key_value(i: &str) -> IResult<&str, (&str, AttributeType)> {
     Ok((rest, result))
 }
 
-fn json_value(i: &str) -> IResult<&str, JsonValue> {
+fn json_value(i: &str) -> IResult<&str, AttributeType> {
     let (rest, result) = preceded(
         multispace0, 
         preceded(
@@ -127,7 +125,7 @@ fn json_value(i: &str) -> IResult<&str, JsonValue> {
     Ok((rest, result))
 }
 
-fn serialised_json(i: &str) -> IResult<&str, JsonValue> {
+fn serialised_json(i: &str) -> IResult<&str, AttributeType> {
     delimited(tag("\""), parse_json, tag("\""))(i)
 }
 
@@ -136,14 +134,14 @@ fn block_value(i: &str) -> IResult<&str, AttributeType> {
     space0,
     alt((
       map(templated_string, AttributeType::TemplatedString),
-      map(serialised_json, AttributeType::Json),
+      serialised_json,
       map(boolean, AttributeType::Boolean),
       map(double, AttributeType::Num),
       map(basic_block, AttributeType::Block),
       map(tf_block, AttributeType::TFBlock),
       map(escaped_string, |s| AttributeType::Str(String::from(s))),
       map(parse_array, AttributeType::Array),
-      map(json_value, AttributeType::Json),
+      json_value,
     )),
   )(i)
 }
@@ -410,7 +408,7 @@ mod tests {
     fn inline_block_with_one_pair() {
         let data = r#"{ "application/json" = "{ \"statusCode\": 200 }" }"#;
         let result = inline_block(data);
-        let expected = Ok(("", ("application/json", AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))])))));
+        let expected = Ok(("", ("application/json", AttributeType::Block(vec![ Attribute { key: String::from("statusCode"), value: AttributeType::Num(200.0) }]))));
         assert_eq!(result, expected)
     }
 
@@ -434,7 +432,7 @@ resource "aws_api_gateway_integration" "discovery_thing" {
                         value: AttributeType::Block(vec![
                             Attribute {
                                 key: String::from("application/json"), 
-                                value: AttributeType::Json(JsonValue::Object(vec![(String::from("statusCode"), JsonValue::Num(200.0))]))
+                                value: AttributeType::Block(vec![ Attribute { key: String::from("statusCode"), value: AttributeType::Num(200.0)}])
                             }
                         ]
                     )
@@ -468,9 +466,9 @@ resource "aws_sqs_queue" "discovery_collector-queue" {
                     },
                     Attribute {
                         key: String::from("policy"),
-                        value: AttributeType::Json(JsonValue::Object(vec![
-                            (String::from("deadLetterTargetArn"), JsonValue::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}"))),
-                            (String::from("maxReceiveCount"), JsonValue::Num(2.0))]))
+                        value: AttributeType::Block(vec![
+                            Attribute { key: String::from("deadLetterTargetArn"), value: AttributeType::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}")) },
+                            Attribute { key: String::from("maxReceiveCount"), value: AttributeType::Num(2.0) }])
                     },
                     Attribute {
                         key: String::from("tags"), 

@@ -9,5 +9,5 @@ use crate::relationship_finders::tf_block_query::tf_block_query::JmespathExpress
 //     Value(AttributeType),
 // }
 pub trait Queryable {
-    fn query(&self, expression: JmespathExpression) -> Option<AttributeType>;
+    fn query(&self, expression: &JmespathExpression) -> Vec<AttributeType>;
 }

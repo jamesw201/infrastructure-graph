@@ -12,7 +12,7 @@ use nom::{
 };
 use std::str;
 
-use crate::structs::json::JsonValue;
+use crate::structs::attributes::{ Attribute, AttributeType };
 
 fn parse_single_line_str(i: &str) -> IResult<&str, String> {
     let (rest, result) = preceded(space0, escaped(is_not("\""), '\\', one_of(r#"\"#)))(i)?;
@@ -37,7 +37,7 @@ fn string(i: &str) -> IResult<&str, String> {
     ))(i)
 }
 
-fn array(i: &str) -> IResult<&str, Vec<JsonValue>> {
+fn array(i: &str) -> IResult<&str, Vec<AttributeType>> {
     preceded(
       preceded(multispace0, char('[')),
       terminated(
@@ -99,7 +99,7 @@ fn escaped_r_string(i: &str) -> IResult<&str, &str> {
     Ok((rest, result))
 }
 
-fn key_value(i: &str) -> IResult<&str, (&str, JsonValue)> {
+fn key_value(i: &str) -> IResult<&str, (&str, AttributeType)> {
     separated_pair(
         escaped_l_string,
         cut(preceded(space0, char(':'))),
@@ -107,7 +107,7 @@ fn key_value(i: &str) -> IResult<&str, (&str, JsonValue)> {
     )(i)
 }
 
-fn hash(i: &str) -> IResult<&str, Vec<(String, JsonValue)>> {
+fn hash(i: &str) -> IResult<&str, Vec<Attribute>> {
     preceded(
         preceded(multispace0, char('{')),
         terminated(
@@ -116,7 +116,8 @@ fn hash(i: &str) -> IResult<&str, Vec<(String, JsonValue)>> {
             |tuple_vec| {
                 tuple_vec
                 .into_iter()
-                .map(|(k, v)| (String::from(k), v))
+                // .map(|(k, v)| (String::from(k), v))
+                .map(|(k, v)| Attribute{ key: String::from(k), value: v })
                 .collect()
             },
             ),                                                                                                                                      
@@ -126,26 +127,26 @@ fn hash(i: &str) -> IResult<&str, Vec<(String, JsonValue)>> {
 }
 
 /// here, we apply the space0 parser before trying to parse a value
-fn json_value(i: &str) -> IResult<&str, JsonValue> {
+fn json_value(i: &str) -> IResult<&str, AttributeType> {
   preceded(
     multispace0,
     alt((
-      map(hash, JsonValue::Object),
-      map(array, JsonValue::Array),
-      map(string, |s| JsonValue::Str(String::from(s))),
-      map(escaped_r_string, |s| JsonValue::Str(String::from(s))),
-      map(double, JsonValue::Num),
-      map(boolean, JsonValue::Boolean),
-      map(null, JsonValue::Null),
+      map(hash, AttributeType::Block),
+      map(array, AttributeType::Array),
+      map(string, |s| AttributeType::Str(String::from(s))),
+      map(escaped_r_string, |s| AttributeType::Str(String::from(s))),
+      map(double, AttributeType::Num),
+      map(boolean, AttributeType::Boolean),
+      map(null, |s| AttributeType::Str(String::from(s))),
     )),
   )(i)
 }
 
 /// the root element of a JSON parser is either an object or an array
-pub fn parse_json(i: &str) -> IResult<&str, JsonValue> {
+pub fn parse_json(i: &str) -> IResult<&str, AttributeType> {
     delimited(
         space0,
-        alt((map(hash, JsonValue::Object), map(array, JsonValue::Array))),
+        alt((map(hash, AttributeType::Block), map(array, AttributeType::Array))),
         opt(space0),
     )(i)
 }
@@ -170,7 +171,7 @@ mod tests {
     fn parse_serialised_json() {
         let data = "{\\\"deadLetterTargetArn\\\":\\\"arn:blarp\\\"}";
         let (_, result) = parse_json(data).unwrap();
-        let expected = JsonValue::Object(vec![(String::from("deadLetterTargetArn"), JsonValue::Str(String::from("arn:blarp")))]);
+        let expected = AttributeType::Block(vec![Attribute{ key: String::from("deadLetterTargetArn"), value: AttributeType::Str(String::from("arn:blarp")) }]);
         assert_eq!(result, expected)
     }
 
@@ -178,7 +179,10 @@ mod tests {
     fn parse_serialised_json_with_rest() {
         let data = "{\\\"deadLetterTargetArn\\\":\\\"${aws_sqs_queue.discovery_collector-deadletter-queue.arn}\\\",\\\"maxReceiveCount\\\":2}\n    tags {\n      Environment        = \"sandbox1\"\n    }\n}\n";
         let (_, result) = parse_json(data).unwrap();
-        let expected = JsonValue::Object(vec![(String::from("deadLetterTargetArn"), JsonValue::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}"))), (String::from("maxReceiveCount"), JsonValue::Num(2.0))]);
+        let expected = AttributeType::Block(vec![
+            Attribute{ key: String::from("deadLetterTargetArn"), value: AttributeType::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}")) }, 
+            Attribute{ key: String::from("maxReceiveCount"), value: AttributeType::Num(2.0)}
+        ]);
         assert_eq!(result, expected)
     }
 
@@ -190,7 +194,9 @@ mod tests {
 }
 "#;
         let (_, result) = parse_json(data).unwrap();
-        let expected = JsonValue::Object(vec![(String::from("deadLetterTargetArn"), JsonValue::Str(String::from("arn:blarp")))]);
+        let expected = AttributeType::Block(vec![
+            Attribute{ key: String::from("deadLetterTargetArn"), value: AttributeType::Str(String::from("arn:blarp")) }
+        ]);
         assert_eq!(result, expected)
     }
 
@@ -205,7 +211,12 @@ mod tests {
 ]
 "#;
         let (_, result) = parse_json(data).unwrap();
-        let expected = JsonValue::Array(vec![JsonValue::Object(vec![(String::from("entryPoint"), JsonValue::Null(String::from("null"))), (String::from("essential"), JsonValue::Boolean(true))])]);
+        let expected = AttributeType::Array(vec![
+            AttributeType::Block(vec![
+                Attribute{ key: String::from("entryPoint"), value: AttributeType::Str(String::from("null")) }, 
+                Attribute{ key: String::from("essential"), value: AttributeType::Boolean(true) }
+            ])
+        ]);
         assert_eq!(result, expected)
     }
 
@@ -242,25 +253,25 @@ mod tests {
   ]
 }
 "#;
-        let expected = JsonValue::Object(
+        let expected = AttributeType::Block(
             vec![
-                (String::from("Version"), JsonValue::Str(String::from("2012-10-17"))),
-                (String::from("Statement"), JsonValue::Array(
+                Attribute{ key: String::from("Version"), value: AttributeType::Str(String::from("2012-10-17")) },
+                Attribute{ key: String::from("Statement"), value: AttributeType::Array(
                     vec![
-                        JsonValue::Object(
+                        AttributeType::Block(
                             vec![
-                                (String::from("Sid"), JsonValue::Str(String::from(""))), 
-                                (String::from("Effect"), JsonValue::Str(String::from("Allow"))),
-                                (String::from("Principal"), JsonValue::Object(
+                                Attribute{ key: String::from("Sid"), value: AttributeType::Str(String::from("")) }, 
+                                Attribute{ key: String::from("Effect"), value: AttributeType::Str(String::from("Allow")) },
+                                Attribute{ key: String::from("Principal"), value: AttributeType::Block(
                                     vec![
-                                        (String::from("Service"), JsonValue::Str(String::from("vpc-flow-logs.amazonaws.com")))
+                                        Attribute{ key: String::from("Service"), value: AttributeType::Str(String::from("vpc-flow-logs.amazonaws.com")) }
                                     ],
-                                )),
-                                (String::from("Action"), JsonValue::Str(String::from("sts:AssumeRole")))
+                                )},
+                                Attribute{ key: String::from("Action"), value: AttributeType::Str(String::from("sts:AssumeRole")) } 
                             ]
-                        )
-                    ])
-                ),
+                        ),
+                    ]
+                )},
             ]
         );
 

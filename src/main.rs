@@ -2,7 +2,7 @@
 use structopt::StructOpt;
 use std::collections::HashMap;
 extern crate serde_yaml;
-use serde::{Deserialize};
+use serde::{Deserialize, Serialize};
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -14,8 +14,10 @@ use exitfailure::ExitFailure;
 use rust_nom_json::structs::policies::Policies;
 use rust_nom_json::*;
 use rust_nom_json::visitors::resource_visitor;
-
-use rust_nom_json::visitors::relationship_visitor::{Relationship};
+use rust_nom_json::visitors::relationship_finder::{ ValidationError, Relationship };
+// mod visitors;
+// use visitors::relationship_finder::{ ValidationError, Relationship };
+// use validator::{Validate, ValidationError};
 
 mod terraform;
 
@@ -34,22 +36,44 @@ struct Cli {
     path: std::path::PathBuf,
 }
 
+fn validate_relationships(aws_relationship_specs: &HashMap<String, Relationship>) -> Vec<ValidationError> {
+    aws_relationship_specs
+        .into_iter()
+        .map(|(_, relationship)| relationship.validate())
+        .filter(|result| result.is_err())
+        .map(|result| result.unwrap_err())
+        .collect()
+}
+
 fn main() -> Result<(), ExitFailure> {
     let start = Instant::now();
     let args = Cli::from_args();
 
     let relationship_file = std::fs::File::open("./example_files/aws_relationships.yaml")?;
     let aws_relationship_specs: HashMap<String, Relationship> = serde_yaml::from_reader(relationship_file)?;
-    // println!("Relationships YAML string: {:?}", aws_relationship_specs);
+    println!("Relationships YAML string: {:?}", aws_relationship_specs);
+
+    // let errors = validate_relationships(&aws_relationship_specs);
+    // if errors.len() > 0 {
+    //     for err in &errors { 
+    //         println!("Error: {:?}", err.code);
+    //     }
+
+    //     return Ok(())
+    // }
 
     let policies_file = std::fs::File::open("./example_files/policies.yaml")?;
     let policy_specs: Policies = serde_yaml::from_reader(policies_file)?;
     // println!("Policies YAML string: {:?}", policy_specs);
+    
+    let occlusions_file = std::fs::File::open("./example_files/occlusions.yaml")?;
+    let occlusion_specs: HashMap<String, Vec<String>> = serde_yaml::from_reader(occlusions_file)?;
+    println!("Occlusions YAML string: {:?}", occlusion_specs);
 
     let parser = cloud_template_parser::CloudTemplateParser::new();
     let parsed_resources = parser.handle(args.path);
 
-    let json = resource_visitor::dispatch(&parsed_resources, aws_relationship_specs, policy_specs);
+    let json = resource_visitor::dispatch(&parsed_resources, aws_relationship_specs, policy_specs, occlusion_specs);
     // // iterate over array, use match statement to get initial visitor right
     // // then allow Visitor pattern to do the rest
     let elapsed_before_printing = start.elapsed();
@@ -67,8 +91,8 @@ fn main() -> Result<(), ExitFailure> {
         Err(why) => panic!("couldn't write to {}: {}", display, why),
         Ok(_) => println!("successfully wrote to {}", display),
     }
-    // println!("json: {:?}", json);
-    // println!("ast: {:?}", parsed_resources);
+    // // println!("json: {:?}", json);
+    // // println!("ast: {:?}", parsed_resources);
 
     let duration = start.elapsed();
     println!("Terraform parsed in: {:?}", elapsed_before_printing);

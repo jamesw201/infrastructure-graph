@@ -4,18 +4,29 @@
 # ----------------------------------------------------------
 # Master key used for encrypting/decrypting discovery collector
 # cache tokens
-resource "aws_kms_key" "discovery_cache-master-key" {
-    description = "Master key used for creating/decrypting cache token data keys"
-    enable_key_rotation = true
-}
+resource "aws_lambda_function" "discovery_api" {
+    function_name        = "discovery_api"
+    depends_on           = [ "aws_iam_role.discovery_api_role" ]
+    role                 = "${aws_iam_role.discovery_api_role.arn}"
+    filename             = "/tmp/nodejs_lambda_stub.zip"
+    tags {
+      Environment        = "sandbox1"
+      Component          = "discovery"
+      Name               = "discovery_api"
+      CreatedBy          = "Platform.S create-infra.py"
+    }
+    handler              = "lib/index.handler"
+    timeout              = 30
+    lifecycle {
+      ignore_changes     = ["handler", "environment"]
+    }
 
-# ==============================================
-# aws_s3_bucket_object : ../service-discovery//infrastructure/aws_s3_bucket_object.yaml
+    vpc_config {
+      subnet_ids         = ["${aws_subnet.discovery_private-subnet-az-a.id}", "${aws_subnet.discovery_private-subnet-az-b.id}"]
+      security_group_ids = ["${aws_security_group.discovery_cache-security-group1.id}"]
+    }
 
-# ----------------------------------------------
-resource "aws_s3_bucket_object" "discovery_cpsc-vmware-config" {
-    bucket               = "acp-platform-s-discovery-sandbox1"
-    source               = "/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"
-    etag                 = "${md5(file("/Users/james.n.wilson/code/work/repos/cd-pipeline/../service-discovery//infrastructure/default-config/cpsc-vmware-config.json"))}"
-    key                  = "default-config/cpsc-vmware-config.json"
+    memory_size          = 768
+    runtime              = "nodejs8.10"
+    description          = "Discovery API"
 }

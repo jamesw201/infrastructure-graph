@@ -1,0 +1,49 @@
+# Entries here will occlude resources from the graph and any relationships in which they appear.
+terraform:
+  - provider
+    terraform
+    terraform_remote_state
+    variable
+
+azure:
+  -
+google:
+  -
+alibaba:
+  -
+oracle:
+  -
+
+aws:
+  - aws_cloudwatch_metric_alarm
+    aws_iam_role_policy
+    aws_api_gateway_base_path_mapping
+    aws_api_gateway_integration
+    aws_appautoscaling_target
+    aws_appautoscaling_policy
+    aws_api_gateway_method
+    aws_api_gateway_resource
+    aws_route_table
+    aws_route
+    aws_route_table_association
+    aws_kms_alias
+    aws_flow_log
+    aws_cloudwatch_log_group
+    aws_iam_policy_document
+    aws_cloudwatch_event_rule
+    aws_cloudwatch_event_target
+    aws_cloudwatch_dashboard
+    aws_cloudwatch_log_metric_filter
+    aws_lambda_permission
+    aws_internet_gateway
+    aws_eip
+    aws_vpc_endpoint
+    aws_s3_bucket_object
+    aws_main_route_table_association
+    aws_s3_bucket_notification
+    aws_sns_topic_subscription
+    aws_security_group
+    aws_api_gateway_rest_api
+    aws_api_gateway_deployment
+    aws_lambda_event_source_mapping
+    aws_elasticache_replication_group

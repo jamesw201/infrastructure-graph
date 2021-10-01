@@ -7,10 +7,9 @@ use std::cell::RefCell;
 
 use crate::structs::attributes::{ Attribute, AttributeType };
 use AttributeType::{
-    Array, Block, Boolean, Json, Num, Str, TFBlock, TemplatedString,
+    Array, Block, Boolean, Num, Str, TFBlock, TemplatedString,
 };
 use crate::structs::template_string::{ TemplateString };
-use crate::structs::json::JsonValue;
 
 use TemplateString::{ Variable, BuiltInFunction };
 
@@ -26,25 +25,25 @@ use crate::structs::terraform_block::{
     TerraformBlockWithTwoIdentifiers,
 };
 
-use crate::relationship_finders::relationship_finder::{RelationshipFinder};
+// use crate::relationship_finders::relationship_finder::{RelationshipFinder};
 use crate::visitors::visitor::{ PolicyEvaluator, Visitor };
-use crate::visitors::relationship_visitor::Relationship;
+use crate::visitors::relationship_finder::Relationship;
+
+use crate::json_to_model::convert_json_to_model;
 
 
-pub struct JsonVisitor {
-    pub relationships: RefCell<Vec<Relationship>>,
-}
+pub struct JsonVisitor {}
 
-impl RelationshipFinder for JsonVisitor {
-    fn add_relationship(&self, relationship: Relationship) {
-        self.relationships.borrow_mut().push(relationship);
-    }
+// impl RelationshipFinder for JsonVisitor {
+//     fn add_relationship(&self, relationship: Relationship) {
+//         self.relationships.borrow_mut().push(relationship);
+//     }
 
-    fn output_relationships(&self) -> String {
-        let joined_relationships = self.relationships.borrow().iter().map(|rel| format!("{}", rel)).collect::<Vec<String>>().join(",");
-        format!("[{}]", joined_relationships)
-    }
-}
+//     fn output_relationships(&self) -> String {
+//         let joined_relationships = self.relationships.borrow().iter().map(|rel| format!("{}", rel)).collect::<Vec<String>>().join(",");
+//         format!("[{}]", joined_relationships)
+//     }
+// }
 
 impl Visitor<String> for JsonVisitor {
     fn visit_str(&self, value: &String) -> String {
@@ -115,7 +114,6 @@ impl Visitor<String> for JsonVisitor {
                 Array(arr_inside) => self.visit_array(arr_inside),
                 Block(block_inside) => self.visit_block(block_inside),
                 TFBlock(tfblock_inside) => self.visit_tfblock(tfblock_inside),
-                Json(json_inside) => self.visit_json(json_inside),
             }
         ).collect();
 
@@ -124,35 +122,6 @@ impl Visitor<String> for JsonVisitor {
         s.push_str(&attributes_joined.to_string());
         s.push_str("]");
         s
-    }
-
-    fn visit_json_array(&self, value: &Vec<JsonValue>) -> String {
-        let array_items: Vec<String> = value.into_iter().map(|val| self.visit_json(&val)).collect();
-        let array_items_joined = array_items.join(",");
-
-        format!("[{}]", &array_items_joined)
-    }
-
-    fn visit_json_object(&self, value: &Vec<(String, JsonValue)>) -> String {
-        let array_items: Vec<String> = value.into_iter()
-            .map(|(key, val)| {
-                format!(r#""{}":{}"#, key, self.visit_json(&val))
-            }).collect();
-
-        let array_items_joined = array_items.join(",");
-
-        format!("{{{}}}", &array_items_joined)
-    }
-
-    fn visit_json(&self, value: &JsonValue) -> String {
-        match &value {
-            JsonValue::Str(str_inside) => self.visit_str(str_inside),
-            JsonValue::Boolean(bool_inside) => self.visit_boolean(bool_inside),
-            JsonValue::Num(num_inside) => self.visit_num(num_inside),
-            JsonValue::Null(str_inside) => self.visit_str(str_inside),
-            JsonValue::Array(arr_inside) => self.visit_json_array(arr_inside),
-            JsonValue::Object(obj_inside) => self.visit_json_object(obj_inside),
-        }
     }
 
     fn visit_attribute(&self, attr: &Attribute) -> String {
@@ -164,7 +133,7 @@ impl Visitor<String> for JsonVisitor {
             Array(arr_inside) => self.visit_array(arr_inside),
             Block(block_inside) => self.visit_block(block_inside),
             TFBlock(tfblock_inside) => self.visit_tfblock(tfblock_inside),
-            Json(json_inside) => self.visit_json(json_inside),
+            // Json(json_inside) => self.visit_json(json_inside),
         };
 
         format!(r#""{}":{}"#, &attr.key, value)
@@ -234,32 +203,28 @@ mod tests {
             }
         );
         let expected = String::from(r#"{"type":"resource","name":"thing1","body":{"backend":"s3","bookend":"true"}}"#);
-        let mut vec = Vec::new();
-        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let visitor = JsonVisitor{};
         let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
 
     #[test]
     fn json_visitor_json() {
-        let resource1 = TerraformBlock::WithTwoIdentifiers(
-            TerraformBlockWithTwoIdentifiers {
-                block_type: String::from("resource"), 
-                first_identifier: String::from("aws_sqs_queue"), 
-                second_identifier: String::from("discovery_collector-queue"), 
-                attributes: vec![
-                    Attribute {
-                        key: String::from("policy"),
-                        value: AttributeType::Json(JsonValue::Object(vec![
-                            (String::from("deadLetterTargetArn"), JsonValue::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}"))),
-                            (String::from("maxReceiveCount"), JsonValue::Num(2.0))]))
-                    },
-                ]
+        let json = r#"
+            {
+                "type":"aws_sqs_queue",
+                "name":"discovery_collector-queue",
+                "body":{
+                    "policy":{
+                        "deadLetterTargetArn":"${aws_sqs_queue.discovery_collector-deadletter-queue.arn}",
+                        "maxReceiveCount":"2.0"
+                    }
+                }
             }
-        );
+        "#;
+        let resource1 = convert_json_to_model(json);
         let expected = String::from(r#"{"type":"aws_sqs_queue","name":"discovery_collector-queue","body":{"policy":{"deadLetterTargetArn":"${aws_sqs_queue.discovery_collector-deadletter-queue.arn}","maxReceiveCount":"2.0"}}}"#);
-        let mut vec = Vec::new();
-        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let visitor = JsonVisitor{};
         let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
@@ -283,8 +248,9 @@ mod tests {
             }
         );
         let expected = String::from(r#"{"type":"aws_cloudwatch_metric_alarm","name":"discovery_diff-engine-queue-cloudwatch-alaram-messages-high","body":{"alarm_name":"discovery_cloudwatch-diff-engine-queue-cloudwatch-alarm-messages-high","alarm_actions":["aws_appautoscaling_policy.discovery_diff-engine-autoscaling-up.arn","aws_appautoscaling_policy.discovery_diff-engine-autoscaling-down.arn"]}}"#);
-        let mut vec = Vec::new();
-        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        // let mut vec = Vec::new();
+        // let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let visitor = JsonVisitor{};
         let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }
@@ -319,8 +285,9 @@ mod tests {
         );
 
         let expected = String::from(r#"{"type":"aws_cloudwatch_log_metric_filter","name":"discovery_diff-tagging-failed-event-error","body":{"name":"diff_tagging_failed_event","metric_transformation":{"name":"diff_tagging_failed_event","namespace":"diff_tagging_log_metrics","value":"1"}}}"#);
-        let mut vec = Vec::new();
-        let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        // let mut vec = Vec::new();
+        // let visitor = JsonVisitor{relationships: RefCell::new(vec)};
+        let visitor = JsonVisitor{};
         let result = visitor.visit_tfblock(&resource1);
         assert_eq!(result, expected)
     }

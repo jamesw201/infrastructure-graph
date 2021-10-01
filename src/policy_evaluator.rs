@@ -12,24 +12,9 @@ use TFQueryResult::{ List, Scalar };
 use std::collections::HashMap;
 use itertools::Itertools;
 
+use crate::structs::policies::FilterResult;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct FilterResult {
-    filter: Filter, // TODO: this should be a Vector of Filters
-    result: bool,
-}
-
-impl FilterResult {
-    pub fn new(filter: Filter, result: bool) -> FilterResult {
-        FilterResult { filter, result }
-    }
-}
-
-impl fmt::Display for FilterResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, r#"{{"filter":"{}","result":"{}"}}"#, self.filter, self.result)
-    }
-}
+use crate::json_to_model::convert_json_to_model;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PolicyResult {
@@ -60,30 +45,6 @@ fn extract_policy_targets(policies: &Policies) -> Vec<String> {
     result.into_iter().unique().collect_vec()
 }
 
-fn evaluate_filter(filter: &Filter, attribute_type: AttributeType) -> FilterResult {
-    let result = match &attribute_type {
-        Block(attributes) => {
-            if &attributes.len() > &0 {
-                match &attributes[0].value {
-                    Str(val) => val == &filter.value,
-                    Num(val) => val == &filter.value.parse::<f64>().unwrap(),
-                    // TODO: accommodate all variants
-                    _ => false,
-                }
-            } else {
-                println!("found bad attribute: {:?}", &attribute_type);
-                false
-            }
-        },
-        Str(val) => val == &filter.value,
-        Num(val) => val == &filter.value.parse::<f64>().unwrap(),
-        // TODO: accommodate all variants
-        _ => false,
-    };
-
-    FilterResult::new(filter.clone(), result)
-}
-
 fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
     let filters: Vec<FilterResult> = policy.filters.iter().map(|filter| {
         let query_result = match resource {
@@ -91,11 +52,7 @@ fn evaluate_policy(policy: &Policy, resource: &TerraformBlock) -> PolicyResult {
             _ => TFQueryResult::None,
         };
 
-        match query_result {
-            List(attribute_types) => FilterResult::new(filter.clone(), false),
-            Scalar(attribute_type) => evaluate_filter(filter, attribute_type),
-            TFQueryResult::None => FilterResult::new(filter.clone(), false),
-        }
+        filter.evaluate(query_result)
     }).collect();
 
     let combined_result = filters.iter().fold(true, |acc, x| acc && x.result);
@@ -170,7 +127,7 @@ mod tests {
         Attribute,
         AttributeType,
     };
-    use crate::structs::json::JsonValue;
+    // use crate::structs::json::JsonValue;
     use crate::structs::policies::{ Policies, Policy, Filter };
 
     fn setup_policies() -> Policies {
@@ -193,67 +150,34 @@ mod tests {
     }
 
     fn setup_resources() -> Vec<TerraformBlock> {
-        vec![
-            TerraformBlock::WithTwoIdentifiers(
-                TerraformBlockWithTwoIdentifiers {
-                    block_type: String::from("resource"),
-                    first_identifier: String::from("aws_iam_role_policy"),
-                    second_identifier: String::from("my-iam-policy"),
-                    attributes: vec![
-                        Attribute {
-                            key: String::from("visibility_timeout_seconds"), 
-                            value: AttributeType::Num(30.0)
-                        },
-                        Attribute {
-                            key: String::from("policy"),
-                            value: AttributeType::Json(JsonValue::Object(vec![
-                                (String::from("deadLetterTargetArn"), JsonValue::Str(String::from("${aws_sqs_queue.discovery_collector-deadletter-queue.arn}"))),
-                                (String::from("maxReceiveCount"), JsonValue::Num(2.0))]))
-                        },
-                    ]
+        let json = vec![
+            r#"{
+                "type":"aws_iam_role_policy",
+                "name":"my-iam-policy",
+                "body":{
+                    "visibility_timeout_seconds": 30.0,
+                    "policy":{
+                        "deadLetterTargetArn":"${aws_sqs_queue.discovery_collector-deadletter-queue.arn}",
+                        "maxReceiveCount":"2.0"
+                    }
                 }
-            ),
-            TerraformBlock::WithTwoIdentifiers(
-                TerraformBlockWithTwoIdentifiers {
-                    block_type: String::from("resource"),
-                    first_identifier: String::from("aws_iam_role_policy"),
-                    second_identifier: String::from("second-iam-policy"),
-                    attributes: vec![
-                        Attribute {
-                            key: String::from("visibility_timeout_seconds"), 
-                            value: AttributeType::Num(30.0)
-                        },
-                    ]
+            }"#,
+            r#"{
+                "type":"aws_iam_role_policy",
+                "name":"second-iam-policy",
+                "body":{
+                    "visibility_timeout_seconds": 30.0
                 }
-            ),
-            TerraformBlock::WithTwoIdentifiers(
-                TerraformBlockWithTwoIdentifiers {
-                    block_type: String::from("resource"),
-                    first_identifier: String::from("aws_ec2_instance"),
-                    second_identifier: String::from("my_ec2_instance"),
-                    attributes: vec![
-                        Attribute {
-                            key: String::from("id"),
-                            value: AttributeType::Str(String::from("id-that-we-are-looking-for"))
-                        }
-                    ]
+            }"#,
+            r#"{
+                "type":"aws_ec2_instance",
+                "name":"my_ec2_instance",
+                "body":{
+                    "id": "id-that-we-are-looking-for"
                 }
-            ),
-        ]
-    }
-
-    #[test]
-    fn evaluate_filter_test() {
-        let policies = setup_policies();
-
-        let filter = Filter::new("policy.maxReceiveCount", "eq", "2.0");
-        let filter_result = FilterResult::new(filter, true);
-
-        let attribute_input = AttributeType::Block(
-            vec![Attribute{ key: String::from("policy.maxReceiveCount"), value: AttributeType::Num(2.0) }]
-        );
-        let result = evaluate_filter(&policies.policies[0].filters[0], attribute_input);
-        assert_eq!(result, filter_result)
+            }"#,
+        ];
+        json.iter().map(|item| super::convert_json_to_model(item)).collect()
     }
 
     #[test]
